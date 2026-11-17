@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../../src/PlayerWallet.Application/PlayerWallet.Application.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Restore locked dependencies and audit vulnerabilities
+        run: dotnet restore PlayerWallet.slnx --locked-mode
+      - name: Verify formatting
+        run: dotnet format PlayerWallet.slnx --verify-no-changes --no-restore
+      - name: Build with analyzers
+        run: dotnet build PlayerWallet.slnx --configuration Release --no-restore
+      - name: Run tests
+        run: dotnet test PlayerWallet.slnx --configuration Release --no-build --no-restore

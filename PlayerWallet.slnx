@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/PlayerWallet.Domain/PlayerWallet.Domain.csproj" />
+    <Project Path="src/PlayerWallet.Application/PlayerWallet.Application.csproj" />
+    <Project Path="src/PlayerWallet.Infrastructure/PlayerWallet.Infrastructure.csproj" />
+    <Project Path="src/PlayerWallet.Console/PlayerWallet.Console.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/PlayerWallet.Domain.Tests/PlayerWallet.Domain.Tests.csproj" />
+    <Project Path="tests/PlayerWallet.Application.Tests/PlayerWallet.Application.Tests.csproj" />
+    <Project Path="tests/PlayerWallet.Infrastructure.Tests/PlayerWallet.Infrastructure.Tests.csproj" />
+    <Project Path="tests/PlayerWallet.Console.Tests/PlayerWallet.Console.Tests.csproj" />
+  </Folder>
+</Solution>
