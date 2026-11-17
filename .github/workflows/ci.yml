@@ -11,8 +11,14 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
+      code-quality: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
       - uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
@@ -22,5 +28,16 @@ jobs:
         run: dotnet format PlayerWallet.slnx --verify-no-changes --no-restore
       - name: Build with analyzers
         run: dotnet build PlayerWallet.slnx --configuration Release --no-restore
-      - name: Run tests
-        run: dotnet test PlayerWallet.slnx --configuration Release --no-build --no-restore
+      - name: Run tests with coverage
+        run: dotnet test PlayerWallet.slnx --configuration Release --no-build --no-restore --collect "XPlat Code Coverage" --results-directory artifacts/test-results
+      - name: Merge coverage reports
+        run: |
+          dotnet tool restore
+          dotnet tool run reportgenerator '-reports:artifacts/test-results/**/coverage.cobertura.xml' '-targetdir:artifacts/coverage' '-reporttypes:Cobertura'
+      - name: Upload coverage to GitHub
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/upload-code-coverage@v1
+        with:
+          file: artifacts/coverage/Cobertura.xml
+          language: C#
+          label: code-coverage/dotnet
