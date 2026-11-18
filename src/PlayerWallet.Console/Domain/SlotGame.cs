@@ -9,40 +9,51 @@ public static class SlotGame
     /// <summary>The inclusive maximum stake.</summary>
     public const decimal MaximumBet = 10m;
 
-    /// <summary>The percentage of rounds that pay nothing.</summary>
+    /// <summary>The percentage of draws that lose.</summary>
     public const int LossPercent = 50;
 
-    /// <summary>The percentage of rounds that pay up to twice the stake.</summary>
+    /// <summary>The percentage of draws that win up to twice the stake.</summary>
     public const int SmallWinPercent = 40;
 
     /// <summary>Plays one round and returns its gross payout.</summary>
     /// <param name="stake">The stake, within the game limits.</param>
     /// <returns>The gross payout, or zero for a loss.</returns>
-    public static Money Play(Money stake) => PayoutFor(Random.Shared.Next(0, 100), stake);
+    public static Money Play(Money stake) => PayoutFor(Classify(Random.Shared.Next(0, 100)), stake);
 
-    /// <summary>Returns the gross payout for a round category and stake.</summary>
-    /// <param name="category">A value from 0 through 99 that selects the outcome band.</param>
+    /// <summary>Selects the payout band for a draw from 0 through 99.</summary>
+    /// <param name="draw">A draw from 0 through 99.</param>
+    /// <returns>The band selected by the draw.</returns>
+    public static PayoutBand Classify(int draw)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(draw);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(draw, 99);
+
+        return draw switch
+        {
+            < LossPercent => PayoutBand.Loss,
+            < LossPercent + SmallWinPercent => PayoutBand.SmallWin,
+            _ => PayoutBand.LargeWin,
+        };
+    }
+
+    /// <summary>Returns a gross payout from the band selected for the round.</summary>
+    /// <param name="band">The payout band for the round.</param>
     /// <param name="stake">The stake, within the game limits.</param>
     /// <returns>The gross payout, or zero for a loss.</returns>
-    public static Money PayoutFor(int category, Money stake)
+    public static Money PayoutFor(PayoutBand band, Money stake)
     {
-        ArgumentOutOfRangeException.ThrowIfNegative(category);
-        ArgumentOutOfRangeException.ThrowIfGreaterThan(category, 99);
-
         if (stake.Amount < MinimumBet || stake.Amount > MaximumBet)
         {
             throw new ArgumentOutOfRangeException(nameof(stake));
         }
 
-        if (category < LossPercent)
-        {
-            return default;
-        }
-
         int cents = decimal.ToInt32(stake.Amount * 100);
-        int payout = category < LossPercent + SmallWinPercent
-            ? Random.Shared.Next(1, (2 * cents) + 1)
-            : Random.Shared.Next((2 * cents) + 1, (10 * cents) + 1);
-        return new Money(payout / 100m);
+        return band switch
+        {
+            PayoutBand.Loss => default,
+            PayoutBand.SmallWin => new Money(Random.Shared.Next(1, (2 * cents) + 1) / 100m),
+            PayoutBand.LargeWin => new Money(Random.Shared.Next((2 * cents) + 1, (10 * cents) + 1) / 100m),
+            _ => throw new ArgumentOutOfRangeException(nameof(band)),
+        };
     }
 }

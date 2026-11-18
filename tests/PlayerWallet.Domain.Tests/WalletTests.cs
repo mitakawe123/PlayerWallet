@@ -6,10 +6,23 @@ namespace PlayerWallet.Domain.Tests;
 public sealed class WalletTests
 {
     /// <summary>Provides amounts that cannot represent nonnegative cent values.</summary>
-    public static TheoryData<decimal> InvalidAmounts => new() { -1m, 0.001m };
+    public static TheoryData<decimal> InvalidAmounts => new() { -1m, 0.001m, 0.005m };
 
     /// <summary>Provides amounts that are valid money values.</summary>
-    public static TheoryData<decimal> ValidAmounts => new() { 0m, 1.23m, 10m };
+    public static TheoryData<decimal> ValidAmounts => new() { 0m, 0.01m, 1.23m, 10m };
+
+    /// <summary>Provides amounts and whether they are valid money values.</summary>
+    public static TheoryData<decimal, bool> MoneyValidity => new()
+    {
+        { 0m, true },
+        { 0.01m, true },
+        { 10m, true },
+        { 1.005m, false },
+        { -0.01m, false },
+    };
+
+    /// <summary>Provides stakes outside the inclusive game limits.</summary>
+    public static TheoryData<decimal> InvalidStakes => new() { 0.99m, 10.01m };
 
     /// <summary>Provides stake limits and their expected validation results.</summary>
     public static TheoryData<decimal, WalletError> BetLimits => new()
@@ -24,11 +37,18 @@ public sealed class WalletTests
     public static TheoryData<decimal, decimal> Settlements => new()
     {
         { 0m, 5m },
+        { 0.01m, 5.01m },
         { 3m, 8m },
         { 5m, 10m },
         { 35.35m, 40.35m },
         { 50m, 55m },
     };
+
+    /// <summary>Reports whether an amount can be stored as money.</summary>
+    [Theory]
+    [MemberData(nameof(MoneyValidity))]
+    public void IsValidAcceptsOnlyNonnegativeCentAmounts(decimal amount, bool expected) =>
+        Assert.Equal(expected, Money.IsValid(amount));
 
     /// <summary>Rejects values that cannot represent nonnegative cent amounts.</summary>
     [Theory]
@@ -94,6 +114,15 @@ public sealed class WalletTests
         Assert.Equal(20m, wallet.Balance.Amount);
     }
 
+    /// <summary>Rejects a bet the balance cannot cover.</summary>
+    [Fact]
+    public void BetCannotExceedTheBalance()
+    {
+        var wallet = new Wallet(Guid.NewGuid(), new Money(5));
+        Assert.Equal(WalletError.InsufficientFunds, wallet.ValidateBet(new Money(10)));
+        Assert.Equal(5m, wallet.Balance.Amount);
+    }
+
     /// <summary>Uses gross payouts, including loss and payouts smaller than the stake.</summary>
     [Theory]
     [MemberData(nameof(Settlements))]
@@ -102,6 +131,16 @@ public sealed class WalletTests
         var wallet = new Wallet(Guid.NewGuid(), new Money(10));
         Assert.Equal(WalletError.None, wallet.SettleBet(new Money(5), new Money(payout)));
         Assert.Equal(expected, wallet.Balance.Amount);
+    }
+
+    /// <summary>Rejects settlement when the stake is outside the game limits.</summary>
+    [Theory]
+    [MemberData(nameof(InvalidStakes))]
+    public void SettlementRejectsStakesOutsideTheLimits(decimal stake)
+    {
+        var wallet = new Wallet(Guid.NewGuid(), new Money(100));
+        Assert.Equal(WalletError.InvalidBet, wallet.SettleBet(new Money(stake), new Money(1)));
+        Assert.Equal(100m, wallet.Balance.Amount);
     }
 
     /// <summary>Does not deduct the stake when the final balance would overflow.</summary>

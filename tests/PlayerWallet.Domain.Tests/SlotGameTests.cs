@@ -2,69 +2,103 @@ using PlayerWallet.Console.Domain;
 
 namespace PlayerWallet.Domain.Tests;
 
-/// <summary>Verifies the fixed game rules and the payout band for each outcome category.</summary>
+/// <summary>Verifies the fixed game rules, category boundaries, and payout bands.</summary>
 public sealed class SlotGameTests
 {
     private static readonly Money Stake = new(5m);
 
-    /// <summary>Pays nothing for every losing category.</summary>
-    [Theory]
-    [InlineData(0)]
-    [InlineData(25)]
-    [InlineData(49)]
-    public void LosingCategoriesPayNothing(int category) =>
-        Assert.Equal(0m, SlotGame.PayoutFor(category, Stake).Amount);
+    /// <summary>Provides stakes outside the inclusive game limits.</summary>
+    public static TheoryData<decimal> InvalidStakes => new() { 0.99m, 10.01m };
 
-    /// <summary>Pays from one cent through twice the stake for small-win categories.</summary>
+    /// <summary>Checks the exact band boundaries.</summary>
     [Theory]
-    [InlineData(50)]
-    [InlineData(70)]
-    [InlineData(89)]
-    public void SmallWinsPayFromOneCentThroughTwiceTheStake(int category) =>
-        Assert.InRange(SlotGame.PayoutFor(category, Stake).Amount, 0.01m, 2 * Stake.Amount);
+    [InlineData(0, PayoutBand.Loss)]
+    [InlineData(49, PayoutBand.Loss)]
+    [InlineData(50, PayoutBand.SmallWin)]
+    [InlineData(89, PayoutBand.SmallWin)]
+    [InlineData(90, PayoutBand.LargeWin)]
+    [InlineData(99, PayoutBand.LargeWin)]
+    public void ClassifyUsesTheDocumentedBoundaries(int draw, PayoutBand expected) =>
+        Assert.Equal(expected, SlotGame.Classify(draw));
 
-    /// <summary>Pays above twice the stake through ten times the stake for large-win categories.</summary>
-    [Theory]
-    [InlineData(90)]
-    [InlineData(95)]
-    [InlineData(99)]
-    public void LargeWinsPayAboveTwiceThroughTenTimesTheStake(int category) =>
-        Assert.InRange(SlotGame.PayoutFor(category, Stake).Amount, (2 * Stake.Amount) + 0.01m, 10 * Stake.Amount);
-
-    /// <summary>Keeps repeated draws inside the band selected by the category.</summary>
-    [Theory]
-    [InlineData(50)]
-    [InlineData(89)]
-    [InlineData(90)]
-    [InlineData(99)]
-    public void RepeatedDrawsStayInsideTheSelectedBand(int category)
+    /// <summary>Maps every possible draw to one of the three bands.</summary>
+    [Fact]
+    public void ClassifyCoversEveryDraw()
     {
-        decimal minimum = category < 90 ? 0.01m : (2 * Stake.Amount) + 0.01m;
-        decimal maximum = category < 90 ? 2 * Stake.Amount : 10 * Stake.Amount;
-        for (int draw = 0; draw < 500; draw++)
+        for (int draw = 0; draw < 100; draw++)
         {
-            Assert.InRange(SlotGame.PayoutFor(category, Stake).Amount, minimum, maximum);
+            PayoutBand expected = draw switch
+            {
+                < 50 => PayoutBand.Loss,
+                < 90 => PayoutBand.SmallWin,
+                _ => PayoutBand.LargeWin,
+            };
+            Assert.Equal(expected, SlotGame.Classify(draw));
         }
     }
 
-    /// <summary>Rejects categories outside the 0 through 99 range.</summary>
+    /// <summary>Rejects draws outside the 0 through 99 range.</summary>
     [Theory]
     [InlineData(-1)]
     [InlineData(100)]
-    public void UnknownCategoriesAreRejected(int category) =>
-        Assert.Throws<ArgumentOutOfRangeException>(() => SlotGame.PayoutFor(category, Stake));
+    public void ClassifyRejectsDrawsOutsideTheRange(int draw) =>
+        Assert.Throws<ArgumentOutOfRangeException>(() => SlotGame.Classify(draw));
+
+    /// <summary>Pays nothing for a loss.</summary>
+    [Fact]
+    public void LossPaysNothing() => Assert.Equal(0m, SlotGame.PayoutFor(PayoutBand.Loss, Stake).Amount);
+
+    /// <summary>Pays from one cent through twice the stake for a small win.</summary>
+    [Theory]
+    [InlineData(1)]
+    [InlineData(5)]
+    [InlineData(10)]
+    public void SmallWinsPayFromOneCentThroughTwiceTheStake(decimal stake) =>
+        Assert.InRange(SlotGame.PayoutFor(PayoutBand.SmallWin, new Money(stake)).Amount, 0.01m, 2 * stake);
+
+    /// <summary>Pays above twice the stake through ten times the stake for a large win.</summary>
+    [Theory]
+    [InlineData(1)]
+    [InlineData(5)]
+    [InlineData(10)]
+    public void LargeWinsPayAboveTwiceThroughTenTimesTheStake(decimal stake) =>
+        Assert.InRange(SlotGame.PayoutFor(PayoutBand.LargeWin, new Money(stake)).Amount, (2 * stake) + 0.01m, 10 * stake);
+
+    /// <summary>Keeps repeated draws inside the selected band.</summary>
+    [Theory]
+    [InlineData(PayoutBand.SmallWin)]
+    [InlineData(PayoutBand.LargeWin)]
+    public void RepeatedDrawsStayInsideTheBand(PayoutBand band)
+    {
+        decimal minimum = band is PayoutBand.SmallWin ? 0.01m : (2 * Stake.Amount) + 0.01m;
+        decimal maximum = band is PayoutBand.SmallWin ? 2 * Stake.Amount : 10 * Stake.Amount;
+        for (int draw = 0; draw < 500; draw++)
+        {
+            Assert.InRange(SlotGame.PayoutFor(band, Stake).Amount, minimum, maximum);
+        }
+    }
 
     /// <summary>Rejects stakes outside the inclusive game limits.</summary>
     [Theory]
-    [InlineData(0.99)]
-    [InlineData(10.01)]
-    public void PlayRejectsStakesOutsideTheLimits(decimal stake) =>
-        Assert.Throws<ArgumentOutOfRangeException>(() => SlotGame.Play(new Money(stake)));
+    [MemberData(nameof(InvalidStakes))]
+    public void PayoutForRejectsStakesOutsideTheLimits(decimal stake) =>
+        Assert.Throws<ArgumentOutOfRangeException>(() => SlotGame.PayoutFor(PayoutBand.Loss, new Money(stake)));
+
+    /// <summary>Rejects an undefined payout band.</summary>
+    [Fact]
+    public void PayoutForRejectsUnknownBands() =>
+        Assert.Throws<ArgumentOutOfRangeException>(() => SlotGame.PayoutFor((PayoutBand)99, Stake));
 
     /// <summary>Accepts the inclusive stake limits and stays within the maximum payout.</summary>
     [Theory]
     [InlineData(1)]
     [InlineData(10)]
-    public void PlayAcceptsInclusiveStakeLimits(decimal stake) =>
+    public void PlayStaysWithinTheMaximumPayout(decimal stake) =>
         Assert.InRange(SlotGame.Play(new Money(stake)).Amount, 0m, 10 * stake);
+
+    /// <summary>Rejects stakes outside the inclusive game limits.</summary>
+    [Theory]
+    [MemberData(nameof(InvalidStakes))]
+    public void PlayRejectsStakesOutsideTheLimits(decimal stake) =>
+        Assert.Throws<ArgumentOutOfRangeException>(() => SlotGame.Play(new Money(stake)));
 }

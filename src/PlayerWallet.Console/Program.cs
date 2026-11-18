@@ -1,6 +1,6 @@
-using PlayerWallet.Application;
 using PlayerWallet.Console;
-using PlayerWallet.Infrastructure;
+using PlayerWallet.Console.Application;
+using PlayerWallet.Console.Infrastructure;
 
 var repository = new InMemoryWalletRepository();
 var service = new WalletService(repository);
