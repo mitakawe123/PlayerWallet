@@ -22,59 +22,63 @@ public sealed class Wallet
     public long Version { get; }
 
     /// <summary>Adds a positive amount without changing state on failure.</summary>
-    public WalletError Deposit(Money amount)
+    /// <param name="amount">The amount to add.</param>
+    /// <returns>The violated rule, or null when the deposit succeeded.</returns>
+    public WalletError? Deposit(Money amount)
     {
         if (amount.Amount is 0)
         {
             return WalletError.InvalidAmount;
         }
 
-        return SetBalance(Balance.Amount, amount.Amount);
+        Balance = new Money(Balance.Amount + amount.Amount);
+        return null;
     }
 
     /// <summary>Withdraws a positive amount that the wallet can cover.</summary>
-    public WalletError Withdraw(Money amount)
+    /// <param name="amount">The amount to remove.</param>
+    /// <returns>The violated rule, or null when the withdrawal succeeded.</returns>
+    public WalletError? Withdraw(Money amount)
     {
-        WalletError error = ValidateDebit(amount);
-        return error is WalletError.None ? SetBalance(Balance.Amount - amount.Amount, 0) : error;
+        if (amount.Amount is 0)
+        {
+            return WalletError.InvalidAmount;
+        }
+
+        if (amount.Amount > Balance.Amount)
+        {
+            return WalletError.InsufficientFunds;
+        }
+
+        Balance = new Money(Balance.Amount - amount.Amount);
+        return null;
     }
 
     /// <summary>Checks whether the wallet can cover a positive stake within the game limits.</summary>
-    public WalletError ValidateBet(Money stake)
+    /// <param name="stake">The stake to check.</param>
+    /// <returns>The violated rule, or null when the stake is playable.</returns>
+    public WalletError? ValidateBet(Money stake)
     {
         if (stake.Amount < SlotGame.MinimumBet || stake.Amount > SlotGame.MaximumBet)
         {
             return WalletError.InvalidBet;
         }
 
-        return ValidateDebit(stake);
+        return stake.Amount > Balance.Amount ? WalletError.InsufficientFunds : null;
     }
 
     /// <summary>Applies a stake and gross payout as one balance change.</summary>
-    public WalletError SettleBet(Money stake, Money payout)
+    /// <param name="stake">The stake to deduct.</param>
+    /// <param name="payout">The gross payout to credit.</param>
+    /// <returns>The violated rule, or null when the settlement succeeded.</returns>
+    public WalletError? SettleBet(Money stake, Money payout)
     {
-        WalletError error = ValidateBet(stake);
-        return error is WalletError.None ? SetBalance(Balance.Amount - stake.Amount, payout.Amount) : error;
-    }
-
-    private WalletError ValidateDebit(Money amount)
-    {
-        if (amount.Amount is 0)
+        if (ValidateBet(stake) is { } error)
         {
-            return WalletError.InvalidAmount;
+            return error;
         }
 
-        return amount.Amount > Balance.Amount ? WalletError.InsufficientFunds : WalletError.None;
-    }
-
-    private WalletError SetBalance(decimal remaining, decimal credit)
-    {
-        if (credit > Money.MaximumAmount - remaining)
-        {
-            return WalletError.BalanceOverflow;
-        }
-
-        Balance = new Money(remaining + credit);
-        return WalletError.None;
+        Balance = new Money(Balance.Amount - stake.Amount + payout.Amount);
+        return null;
     }
 }

@@ -1,4 +1,5 @@
 using System.Text;
+using PlayerWallet.Console.Domain;
 
 namespace PlayerWallet.Console;
 
@@ -15,12 +16,6 @@ internal static class ConsoleMessages
 
     internal const string InvalidBet = "Bet is outside the allowed limits.";
 
-    internal const string BalanceOverflow = "The resulting balance is too large.";
-
-    internal const string ConcurrencyConflict = "Wallet changed. This operation was not saved; no automatic retry was made.";
-
-    internal const string WalletNotFound = "Wallet was not found.";
-
     internal const string Goodbye = "Thank you for playing! Hope to see you again soon.";
 
     internal const string ExitPrompt = "Press any key to exit.";
@@ -29,11 +24,20 @@ internal static class ConsoleMessages
 
     internal const string UnexpectedError = "An unexpected error ended the session. The operation outcome could not be confirmed.";
 
-    internal const string BalanceUnavailable = "unavailable";
-
     internal const string WholeMoneyFormat = "$0";
 
     internal const string MoneyFormat = "$0.00";
+
+    /// <summary>Returns the message shown for a wallet rule.</summary>
+    /// <param name="error">The violated rule.</param>
+    /// <returns>The message for the rule.</returns>
+    internal static string For(WalletError error) => error switch
+    {
+        WalletError.InvalidAmount => InvalidAmount,
+        WalletError.InsufficientFunds => InsufficientFunds,
+        WalletError.InvalidBet => InvalidBet,
+        _ => throw new ArgumentOutOfRangeException(nameof(error), error, "Unknown wallet rule."),
+    };
 
     internal static readonly CompositeFormat DepositFormat =
         CompositeFormat.Parse("Your deposit of {0} was successful. Your current balance is: {1}");

@@ -25,11 +25,11 @@ public sealed class WalletTests
     public static TheoryData<decimal> InvalidStakes => new() { 0.99m, 10.01m };
 
     /// <summary>Provides stake limits and their expected validation results.</summary>
-    public static TheoryData<decimal, WalletError> BetLimits => new()
+    public static TheoryData<decimal, WalletError?> BetLimits => new()
     {
         { 0.99m, WalletError.InvalidBet },
-        { 1m, WalletError.None },
-        { 10m, WalletError.None },
+        { 1m, null },
+        { 10m, null },
         { 10.01m, WalletError.InvalidBet },
     };
 
@@ -81,7 +81,7 @@ public sealed class WalletTests
         var wallet = new Wallet(Guid.NewGuid(), new Money(10));
         Assert.Equal(WalletError.InsufficientFunds, wallet.Withdraw(new Money(11)));
         Assert.Equal(10m, wallet.Balance.Amount);
-        Assert.Equal(WalletError.None, wallet.Withdraw(new Money(10)));
+        Assert.Null(wallet.Withdraw(new Money(10)));
         Assert.Equal(0m, wallet.Balance.Amount);
     }
 
@@ -95,19 +95,19 @@ public sealed class WalletTests
         Assert.Equal(10m, wallet.Balance.Amount);
     }
 
-    /// <summary>Preserves the wallet if a deposit would overflow.</summary>
+    /// <summary>Preserves the wallet when a deposit exceeds the supported range.</summary>
     [Fact]
     public void DepositOverflowLeavesBalanceUnchanged()
     {
         var wallet = new Wallet(Guid.NewGuid(), new Money(Money.MaximumAmount));
-        Assert.Equal(WalletError.BalanceOverflow, wallet.Deposit(new Money(1)));
+        Assert.Throws<ArgumentOutOfRangeException>(() => wallet.Deposit(new Money(1)));
         Assert.Equal(Money.MaximumAmount, wallet.Balance.Amount);
     }
 
     /// <summary>Checks inclusive bet limits before settlement.</summary>
     [Theory]
     [MemberData(nameof(BetLimits))]
-    public void BetLimitsAreInclusive(decimal stake, WalletError expected)
+    public void BetLimitsAreInclusive(decimal stake, WalletError? expected)
     {
         var wallet = new Wallet(Guid.NewGuid(), new Money(20));
         Assert.Equal(expected, wallet.ValidateBet(new Money(stake)));
@@ -129,7 +129,7 @@ public sealed class WalletTests
     public void SettlementUsesGrossPayout(decimal payout, decimal expected)
     {
         var wallet = new Wallet(Guid.NewGuid(), new Money(10));
-        Assert.Equal(WalletError.None, wallet.SettleBet(new Money(5), new Money(payout)));
+        Assert.Null(wallet.SettleBet(new Money(5), new Money(payout)));
         Assert.Equal(expected, wallet.Balance.Amount);
     }
 
@@ -143,12 +143,12 @@ public sealed class WalletTests
         Assert.Equal(100m, wallet.Balance.Amount);
     }
 
-    /// <summary>Does not deduct the stake when the final balance would overflow.</summary>
+    /// <summary>Does not deduct the stake when the final balance exceeds the supported range.</summary>
     [Fact]
     public void SettlementOverflowIsAtomic()
     {
         var wallet = new Wallet(Guid.NewGuid(), new Money(Money.MaximumAmount));
-        Assert.Equal(WalletError.BalanceOverflow, wallet.SettleBet(new Money(1), new Money(10)));
+        Assert.Throws<ArgumentOutOfRangeException>(() => wallet.SettleBet(new Money(1), new Money(10)));
         Assert.Equal(Money.MaximumAmount, wallet.Balance.Amount);
     }
 }
