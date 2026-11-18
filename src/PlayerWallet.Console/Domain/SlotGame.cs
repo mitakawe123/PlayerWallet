@@ -15,6 +15,11 @@ public static class SlotGame
     /// <summary>The percentage of draws that win up to twice the stake.</summary>
     public const int SmallWinPercent = 40;
 
+    /// <summary>Checks whether a stake is inside the inclusive game limits.</summary>
+    /// <param name="stake">The stake to check.</param>
+    /// <returns>True when the stake can be played.</returns>
+    public static bool IsStakeWithinLimits(decimal stake) => stake is >= MinimumBet and <= MaximumBet;
+
     /// <summary>Plays one round and returns its gross payout.</summary>
     /// <param name="stake">The stake, within the game limits.</param>
     /// <returns>The gross payout, or zero for a loss.</returns>
@@ -42,7 +47,7 @@ public static class SlotGame
     /// <returns>The gross payout, or zero for a loss.</returns>
     public static Money PayoutFor(PayoutBand band, Money stake)
     {
-        if (stake.Amount < MinimumBet || stake.Amount > MaximumBet)
+        if (!IsStakeWithinLimits(stake.Amount))
         {
             throw new ArgumentOutOfRangeException(nameof(stake));
         }

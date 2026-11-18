@@ -5,17 +5,14 @@ namespace PlayerWallet.Application.Tests;
 
 internal sealed class TestRepository : IWalletRepository
 {
+    private readonly Dictionary<Guid, OperationResult> _applied = [];
     private Guid _id;
     private Money _balance;
-    private long _version;
 
-    /// <summary>Gets or sets whether saves simulate a version conflict.</summary>
-    public bool Conflict { get; set; }
-
-    /// <summary>Gets or sets whether saves throw a storage error.</summary>
+    /// <summary>Gets or sets whether execution fails before recording anything.</summary>
     public bool Fail { get; set; }
 
-    /// <summary>Gets the number of attempted saves.</summary>
+    /// <summary>Gets the number of operations that were committed.</summary>
     public int Saves { get; private set; }
 
     /// <summary>Creates the isolated test wallet snapshot.</summary>
@@ -28,24 +25,40 @@ internal sealed class TestRepository : IWalletRepository
 
     /// <summary>Loads a fresh wallet instance from the test snapshot.</summary>
     public Task<Wallet?> GetAsync(Guid id, CancellationToken cancellationToken = default) =>
-        Task.FromResult<Wallet?>(id == this._id ? new Wallet(id, _balance, _version) : null);
+        Task.FromResult<Wallet?>(id == _id ? new Wallet(id, _balance) : null);
 
-    /// <summary>Simulates a conditional save or configured failure.</summary>
-    public Task<bool> SaveAsync(Wallet wallet, CancellationToken cancellationToken = default)
+    /// <summary>Simulates one atomic commit, a replay, or a configured storage failure.</summary>
+    public Task<OperationResult> ExecuteAsync(
+        Guid id,
+        Guid operationId,
+        Func<Wallet, OperationResult> apply,
+        CancellationToken cancellationToken = default)
     {
-        Saves++;
         if (Fail)
         {
             throw new IOException("Storage unavailable.");
         }
 
-        if (Conflict || wallet.Version != _version)
+        if (_applied.TryGetValue(operationId, out OperationResult replay))
         {
-            return Task.FromResult(false);
+            return Task.FromResult(replay);
         }
 
-        _balance = wallet.Balance;
-        _version++;
-        return Task.FromResult(true);
+        if (id != _id)
+        {
+            throw new InvalidOperationException("The wallet does not exist.");
+        }
+
+        var candidate = new Wallet(id, _balance);
+        OperationResult result = apply(candidate);
+        if (result.Error is not null)
+        {
+            return Task.FromResult(result);
+        }
+
+        _balance = candidate.Balance;
+        _applied[operationId] = result;
+        Saves++;
+        return Task.FromResult(result);
     }
 }

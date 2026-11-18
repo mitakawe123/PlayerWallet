@@ -3,13 +3,11 @@ namespace PlayerWallet.Console.Domain;
 /// <summary>Protects a wallet balance from invalid money movements.</summary>
 public sealed class Wallet
 {
-    /// <summary>Creates a wallet with its balance and last persisted version.</summary>
-    public Wallet(Guid id, Money balance, long version = 0)
+    /// <summary>Creates a wallet with its identifier and starting balance.</summary>
+    public Wallet(Guid id, Money balance)
     {
-        ArgumentOutOfRangeException.ThrowIfNegative(version);
         Id = id;
         Balance = balance;
-        Version = version;
     }
 
     /// <summary>Gets the wallet identifier.</summary>
@@ -17,9 +15,6 @@ public sealed class Wallet
 
     /// <summary>Gets the current balance.</summary>
     public Money Balance { get; private set; }
-
-    /// <summary>Gets the persisted version used to reject stale saves.</summary>
-    public long Version { get; }
 
     /// <summary>Adds a positive amount without changing state on failure.</summary>
     /// <param name="amount">The amount to add.</param>
@@ -59,7 +54,7 @@ public sealed class Wallet
     /// <returns>The violated rule, or null when the stake is playable.</returns>
     public WalletError? ValidateBet(Money stake)
     {
-        if (stake.Amount < SlotGame.MinimumBet || stake.Amount > SlotGame.MaximumBet)
+        if (!SlotGame.IsStakeWithinLimits(stake.Amount))
         {
             return WalletError.InvalidBet;
         }

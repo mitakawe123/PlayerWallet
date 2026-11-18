@@ -35,11 +35,12 @@ public sealed class ConsoleApplication(WalletService service, TextReader input, 
                     break;
                 }
 
+                Guid operationId = Guid.CreateVersion7();
                 OperationResult result = command switch
                 {
-                    CommandKind.Deposit => await service.DepositAsync(id, amount, cancellationToken),
-                    CommandKind.Withdraw => await service.WithdrawAsync(id, amount, cancellationToken),
-                    CommandKind.Bet => await service.PlaceBetAsync(id, amount, cancellationToken),
+                    CommandKind.Deposit => await service.DepositAsync(id, operationId, amount, cancellationToken),
+                    CommandKind.Withdraw => await service.WithdrawAsync(id, operationId, amount, cancellationToken),
+                    CommandKind.Bet => await service.PlaceBetAsync(id, operationId, amount, cancellationToken),
                     _ => throw new InvalidOperationException(ConsoleMessages.InvalidCommand),
                 };
 
