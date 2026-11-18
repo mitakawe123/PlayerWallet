@@ -1,8 +1,5 @@
 <Solution>
   <Folder Name="/src/">
-    <Project Path="src/PlayerWallet.Domain/PlayerWallet.Domain.csproj" />
-    <Project Path="src/PlayerWallet.Application/PlayerWallet.Application.csproj" />
-    <Project Path="src/PlayerWallet.Infrastructure/PlayerWallet.Infrastructure.csproj" />
     <Project Path="src/PlayerWallet.Console/PlayerWallet.Console.csproj" />
   </Folder>
   <Folder Name="/tests/">

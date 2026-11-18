@@ -3,7 +3,6 @@
     <OutputType>Exe</OutputType>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../PlayerWallet.Application/PlayerWallet.Application.csproj" />
-    <ProjectReference Include="../PlayerWallet.Infrastructure/PlayerWallet.Infrastructure.csproj" />
+    <InternalsVisibleTo Include="PlayerWallet.Console.Tests" />
   </ItemGroup>
 </Project>
