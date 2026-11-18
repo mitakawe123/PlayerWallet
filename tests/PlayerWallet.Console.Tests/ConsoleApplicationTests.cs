@@ -1,7 +1,7 @@
 using System.Globalization;
-using PlayerWallet.Application;
+using PlayerWallet.Console.Application;
 using PlayerWallet.Console.Domain;
-using PlayerWallet.Infrastructure;
+using PlayerWallet.Console.Infrastructure;
 
 namespace PlayerWallet.Console.Tests;
 
@@ -15,14 +15,29 @@ public sealed class ConsoleApplicationTests
     [InlineData("deposit 1 extra")]
     [InlineData("deposit 1,50")]
     [InlineData("deposit 1e2")]
+    [InlineData("deposit 1.234")]
+    [InlineData("deposit 1\t2")]
     [InlineData("deposit 1.000000000000000000000000000000001")]
     [InlineData("withdraw NaN")]
     [InlineData("exit 1")]
+    [InlineData("exit now")]
     [InlineData("unknown 2")]
     [InlineData("1 10")]
     [InlineData("Deposit,Bet 5")]
     [InlineData("deposit 1 2")]
     public void InvalidCommandsAreRejected(string input) => Assert.False(CommandParser.TryParse(input, out _, out _));
+
+    /// <summary>Accepts cent-precision amounts, including trailing zeros.</summary>
+    [Theory]
+    [InlineData("deposit 1.23", "1.23")]
+    [InlineData("deposit 1.230", "1.23")]
+    [InlineData("bet 10", "10")]
+    [InlineData("withdraw 0.01", "0.01")]
+    public void ParserAcceptsCentPrecisionAmounts(string input, string expected)
+    {
+        Assert.True(CommandParser.TryParse(input, out _, out decimal amount));
+        Assert.Equal(decimal.Parse(expected, CultureInfo.InvariantCulture), amount);
+    }
 
     /// <summary>Supports case-insensitive commands and surrounding whitespace.</summary>
     [Fact]
@@ -45,7 +60,7 @@ public sealed class ConsoleApplicationTests
         Assert.Equal(CommandKind.Exit, command);
     }
 
-    /// <summary>Formats deposit, withdrawal, win, and loss messages as the brief shows.</summary>
+    /// <summary>Formats amounts and outcomes as the brief shows.</summary>
     [Fact]
     public void ResultFormattingMatchesTheBrief()
     {
@@ -55,6 +70,12 @@ public sealed class ConsoleApplicationTests
                 CommandKind.Deposit,
                 10m,
                 new OperationResult(WalletError.None, new Money(10m))));
+        Assert.Equal(
+            "Your deposit of $10.50 was successful. Your current balance is: $10.50",
+            ConsoleApplication.FormatSuccess(
+                CommandKind.Deposit,
+                10.5m,
+                new OperationResult(WalletError.None, new Money(10.5m))));
         Assert.Equal(
             "Your withdrawal of $40.35 was successful. Your current balance is: $0",
             ConsoleApplication.FormatSuccess(
@@ -67,6 +88,12 @@ public sealed class ConsoleApplicationTests
                 CommandKind.Bet,
                 5m,
                 new OperationResult(WalletError.None, new Money(40.35m), new Money(35.35m))));
+        Assert.Equal(
+            "Congrats - you won $0.15! Your current balance is: $0.15",
+            ConsoleApplication.FormatSuccess(
+                CommandKind.Bet,
+                5m,
+                new OperationResult(WalletError.None, new Money(0.15m), new Money(0.15m))));
         Assert.Equal(
             "No luck this time! Your current balance is: $5",
             ConsoleApplication.FormatSuccess(
@@ -95,6 +122,27 @@ public sealed class ConsoleApplicationTests
         Assert.Contains("Thank you for playing!", transcript, StringComparison.Ordinal);
         Assert.EndsWith("Press any key to exit." + Environment.NewLine, transcript, StringComparison.Ordinal);
         Assert.DoesNotContain("Your deposit of $5", transcript, StringComparison.Ordinal);
+    }
+
+    /// <summary>Reports expected errors with the unchanged balance and keeps the session alive.</summary>
+    [Fact]
+    public async Task ErrorsShowTheCurrentBalance()
+    {
+        using var input = new StringReader("withdraw 1\nbet 11\nbet 5\ndeposit -1\nwat\nexit\n");
+        using var output = new StringWriter(CultureInfo.InvariantCulture);
+        var service = new WalletService(new InMemoryWalletRepository());
+        Assert.Equal(0, await new ConsoleApplication(service, input, output).RunAsync());
+        string transcript = output.ToString();
+        Assert.Contains("Insufficient funds. Your current balance is: $0", transcript, StringComparison.Ordinal);
+        Assert.Contains("Bet is outside the allowed limits. Your current balance is: $0", transcript, StringComparison.Ordinal);
+        Assert.Contains(
+            "Amount must be positive and have no fractional cents. Your current balance is: $0",
+            transcript,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "Invalid command. Use deposit, withdraw, or bet with an amount, or exit. Your current balance is: $0",
+            transcript,
+            StringComparison.Ordinal);
     }
 
     /// <summary>Exits cleanly when cancelled while waiting for a command.</summary>
