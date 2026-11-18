@@ -13,12 +13,10 @@ public sealed class ConsoleApplication(WalletService service, TextReader input, 
         try
         {
             Guid id = await service.CreateWalletAsync(cancellationToken);
-            await output.WriteLineAsync(ConsoleMessages.Help);
-            await PrintBalanceAsync(default(Money));
 
             while (!cancellationToken.IsCancellationRequested)
             {
-                await output.WriteAsync(ConsoleMessages.Prompt);
+                await output.WriteLineAsync(ConsoleMessages.Prompt.AsMemory(), cancellationToken);
                 string? line = await input.ReadLineAsync(cancellationToken);
                 if (line is null)
                 {
@@ -27,9 +25,8 @@ public sealed class ConsoleApplication(WalletService service, TextReader input, 
 
                 if (!CommandParser.TryParse(line, out CommandKind command, out decimal amount))
                 {
-                    await output.WriteLineAsync(ConsoleMessages.InvalidCommand);
                     OperationResult balance = await service.GetBalanceAsync(id, cancellationToken);
-                    await PrintBalanceAsync(balance.Balance);
+                    await WriteFailureAsync(ConsoleMessages.InvalidCommand, balance.Balance, cancellationToken);
                     continue;
                 }
 
@@ -46,37 +43,96 @@ public sealed class ConsoleApplication(WalletService service, TextReader input, 
                     _ => throw new InvalidOperationException(ConsoleMessages.InvalidCommand),
                 };
 
-                string message = result.Error switch
-                {
-                    WalletError.None => result.Payout is { } payout ? string.Format(CultureInfo.InvariantCulture, ConsoleMessages.PayoutFormat, Format(payout)) : ConsoleMessages.Success,
-                    WalletError.InvalidAmount => ConsoleMessages.InvalidAmount,
-                    WalletError.InsufficientFunds => ConsoleMessages.InsufficientFunds,
-                    WalletError.InvalidBet => ConsoleMessages.InvalidBet,
-                    WalletError.BalanceOverflow => ConsoleMessages.BalanceOverflow,
-                    WalletError.ConcurrencyConflict => ConsoleMessages.ConcurrencyConflict,
-                    _ => ConsoleMessages.WalletNotFound,
-                };
-                await output.WriteLineAsync(message);
-                await PrintBalanceAsync(result.Balance);
+                await WriteResultAsync(command, amount, result, cancellationToken);
             }
 
-            await output.WriteLineAsync(ConsoleMessages.Goodbye);
+            await output.WriteLineAsync(ConsoleMessages.Goodbye.AsMemory(), cancellationToken);
+            await output.WriteLineAsync(ReadOnlyMemory<char>.Empty, cancellationToken);
+            await output.WriteLineAsync(ConsoleMessages.ExitPrompt.AsMemory(), cancellationToken);
             return 0;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            await output.WriteLineAsync(ConsoleMessages.Cancelled);
+            await output.WriteLineAsync(ConsoleMessages.Cancelled.AsMemory(), CancellationToken.None);
             return 0;
         }
         catch (Exception)
         {
-            await output.WriteLineAsync(ConsoleMessages.UnexpectedError);
+            await output.WriteLineAsync(ConsoleMessages.UnexpectedError.AsMemory(), CancellationToken.None);
             return 1;
         }
     }
 
-    private Task PrintBalanceAsync(Money? balance) => output.WriteLineAsync(balance is { } money
-        ? string.Format(CultureInfo.InvariantCulture, ConsoleMessages.BalanceFormat, Format(money)) : ConsoleMessages.BalanceUnavailable);
+    private async Task WriteResultAsync(
+        CommandKind command,
+        decimal amount,
+        OperationResult result,
+        CancellationToken cancellationToken)
+    {
+        if (result.Error is WalletError.WalletNotFound)
+        {
+            await output.WriteLineAsync(ConsoleMessages.WalletNotFound.AsMemory(), cancellationToken);
+            return;
+        }
 
-    private static string Format(Money money) => money.Amount.ToString(ConsoleMessages.MoneyFormat, CultureInfo.InvariantCulture);
+        if (result.Error is not WalletError.None)
+        {
+            await WriteFailureAsync(ErrorMessage(result.Error), result.Balance, cancellationToken);
+            return;
+        }
+
+        string balance = FormatBalance(result.Balance);
+        string message = command switch
+        {
+            CommandKind.Deposit => string.Format(
+                CultureInfo.InvariantCulture,
+                ConsoleMessages.DepositFormat,
+                FormatAmount(amount),
+                balance),
+            CommandKind.Withdraw => string.Format(
+                CultureInfo.InvariantCulture,
+                ConsoleMessages.WithdrawalFormat,
+                FormatAmount(amount),
+                balance),
+            CommandKind.Bet when result.Payout is { } payout => string.Format(
+                CultureInfo.InvariantCulture,
+                ConsoleMessages.WinFormat,
+                FormatAmount(payout.Amount),
+                balance),
+            CommandKind.Bet => string.Format(
+                CultureInfo.InvariantCulture,
+                ConsoleMessages.LossFormat,
+                balance),
+            _ => throw new InvalidOperationException(ConsoleMessages.InvalidCommand),
+        };
+
+        await output.WriteLineAsync(message.AsMemory(), cancellationToken);
+    }
+
+    private Task WriteFailureAsync(string message, Money? balance, CancellationToken cancellationToken) =>
+        output.WriteLineAsync(
+            string.Format(
+                CultureInfo.InvariantCulture,
+                ConsoleMessages.FailureFormat,
+                message,
+                FormatBalance(balance)).AsMemory(),
+            cancellationToken);
+
+    private static string ErrorMessage(WalletError error) => error switch
+    {
+        WalletError.InvalidAmount => ConsoleMessages.InvalidAmount,
+        WalletError.InsufficientFunds => ConsoleMessages.InsufficientFunds,
+        WalletError.InvalidBet => ConsoleMessages.InvalidBet,
+        WalletError.BalanceOverflow => ConsoleMessages.BalanceOverflow,
+        WalletError.ConcurrencyConflict => ConsoleMessages.ConcurrencyConflict,
+        _ => ConsoleMessages.WalletNotFound,
+    };
+
+    private static string FormatBalance(Money? balance) => balance is { } money
+        ? FormatAmount(money.Amount)
+        : ConsoleMessages.BalanceUnavailable;
+
+    private static string FormatAmount(decimal amount) => amount == decimal.Truncate(amount)
+        ? amount.ToString(ConsoleMessages.WholeMoneyFormat, CultureInfo.InvariantCulture)
+        : amount.ToString(ConsoleMessages.MoneyFormat, CultureInfo.InvariantCulture);
 }

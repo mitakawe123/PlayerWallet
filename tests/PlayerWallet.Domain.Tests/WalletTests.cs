@@ -3,17 +3,39 @@ namespace PlayerWallet.Domain.Tests;
 /// <summary>Verifies wallet money invariants and atomic settlement.</summary>
 public sealed class WalletTests
 {
+    /// <summary>Provides amounts that cannot represent nonnegative cent values.</summary>
+    public static TheoryData<decimal> InvalidAmounts => new() { -1m, 0.001m };
+
+    /// <summary>Provides amounts that are valid money values.</summary>
+    public static TheoryData<decimal> ValidAmounts => new() { 0m, 1.23m, 10m };
+
+    /// <summary>Provides stake limits and their expected validation results.</summary>
+    public static TheoryData<decimal, WalletError> BetLimits => new()
+    {
+        { 0.99m, WalletError.InvalidBet },
+        { 1m, WalletError.None },
+        { 10m, WalletError.None },
+        { 10.01m, WalletError.InvalidBet },
+    };
+
+    /// <summary>Provides payouts and the expected gross-settlement balances.</summary>
+    public static TheoryData<decimal, decimal> Settlements => new()
+    {
+        { 0m, 5m },
+        { 3m, 8m },
+        { 5m, 10m },
+        { 35.35m, 40.35m },
+        { 50m, 55m },
+    };
+
     /// <summary>Rejects values that cannot represent nonnegative cent amounts.</summary>
     [Theory]
-    [InlineData(-1)]
-    [InlineData(0.001)]
+    [MemberData(nameof(InvalidAmounts))]
     public void MoneyRejectsInvalidAmounts(decimal amount) => Assert.Throws<ArgumentOutOfRangeException>(() => new Money(amount));
 
     /// <summary>Accepts zero balances and exact cents.</summary>
     [Theory]
-    [InlineData(0)]
-    [InlineData(1.23)]
-    [InlineData(10)]
+    [MemberData(nameof(ValidAmounts))]
     public void MoneyPreservesValidAmounts(decimal amount)
     {
         var money = new Money(amount);
@@ -62,10 +84,7 @@ public sealed class WalletTests
 
     /// <summary>Checks inclusive bet limits before settlement.</summary>
     [Theory]
-    [InlineData(0.99, WalletError.InvalidBet)]
-    [InlineData(1, WalletError.None)]
-    [InlineData(10, WalletError.None)]
-    [InlineData(10.01, WalletError.InvalidBet)]
+    [MemberData(nameof(BetLimits))]
     public void BetLimitsAreInclusive(decimal stake, WalletError expected)
     {
         var wallet = new Wallet(Guid.NewGuid(), new Money(20));
@@ -75,11 +94,7 @@ public sealed class WalletTests
 
     /// <summary>Uses gross payouts, including loss and payouts smaller than the stake.</summary>
     [Theory]
-    [InlineData(0, 5)]
-    [InlineData(3, 8)]
-    [InlineData(5, 10)]
-    [InlineData(35.35, 40.35)]
-    [InlineData(50, 55)]
+    [MemberData(nameof(Settlements))]
     public void SettlementUsesGrossPayout(decimal payout, decimal expected)
     {
         var wallet = new Wallet(Guid.NewGuid(), new Money(10));
@@ -95,5 +110,4 @@ public sealed class WalletTests
         Assert.Equal(WalletError.BalanceOverflow, wallet.SettleBet(new Money(1), new Money(10), new GameRules()));
         Assert.Equal(Money.MaximumAmount, wallet.Balance.Amount);
     }
-
 }

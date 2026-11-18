@@ -22,6 +22,21 @@ public sealed class WalletServiceTests
         Assert.Equal(0m, (await service.WithdrawAsync(id, 40.35m)).Balance?.Amount);
     }
 
+    /// <summary>Returns no payout when the round is a loss.</summary>
+    [Fact]
+    public async Task LosingBetReturnsNoPayout()
+    {
+        var repository = new TestRepository();
+        var service = new WalletService(repository, new SlotGame(new GameRules(), new TestRandom(category: 0)));
+        Guid id = await service.CreateWalletAsync();
+        await service.DepositAsync(id, 10);
+        OperationResult result = await service.PlaceBetAsync(id, 5);
+        Assert.Equal(WalletError.None, result.Error);
+        Assert.Null(result.Payout);
+        Assert.Equal(5m, result.Balance?.Amount);
+        Assert.Equal(2, repository.Saves);
+    }
+
     /// <summary>Rejects invalid amounts without saving or consuming randomness.</summary>
     [Theory]
     [InlineData(0)]
