@@ -1,6 +1,6 @@
 using System.Globalization;
 using PlayerWallet.Application;
-using PlayerWallet.Domain;
+using PlayerWallet.Console.Domain;
 using PlayerWallet.Infrastructure;
 
 namespace PlayerWallet.Console.Tests;

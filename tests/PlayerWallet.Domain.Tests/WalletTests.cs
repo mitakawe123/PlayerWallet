@@ -1,3 +1,5 @@
+using PlayerWallet.Console.Domain;
+
 namespace PlayerWallet.Domain.Tests;
 
 /// <summary>Verifies wallet money invariants and atomic settlement.</summary>

@@ -1,4 +1,4 @@
-namespace PlayerWallet.Domain;
+namespace PlayerWallet.Console.Domain;
 
 /// <summary>Identifies an expected wallet operation failure.</summary>
 public enum WalletError

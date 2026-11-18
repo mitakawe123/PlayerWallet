@@ -1,3 +1,5 @@
+using PlayerWallet.Console.Domain;
+
 namespace PlayerWallet.Domain.Tests;
 
 /// <summary>Verifies the fixed game rules and the payout band for each outcome category.</summary>

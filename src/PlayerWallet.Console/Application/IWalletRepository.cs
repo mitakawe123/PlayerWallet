@@ -1,6 +1,6 @@
-using PlayerWallet.Domain;
+using PlayerWallet.Console.Domain;
 
-namespace PlayerWallet.Application;
+namespace PlayerWallet.Console.Application;
 
 /// <summary>Stores independent wallet copies with optimistic concurrency.</summary>
 public interface IWalletRepository

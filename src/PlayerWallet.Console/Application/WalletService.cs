@@ -1,6 +1,6 @@
-using PlayerWallet.Domain;
+using PlayerWallet.Console.Domain;
 
-namespace PlayerWallet.Application;
+namespace PlayerWallet.Console.Application;
 
 /// <summary>Coordinates wallet operations and explicit persistence.</summary>
 public sealed class WalletService(IWalletRepository repository)

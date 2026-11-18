@@ -1,6 +1,6 @@
-using PlayerWallet.Domain;
+using PlayerWallet.Console.Domain;
 
-namespace PlayerWallet.Application;
+namespace PlayerWallet.Console.Application;
 
 /// <summary>Describes an operation and the balance observed for its result.</summary>
 /// <param name="Error">The failure code, or None for success.</param>
