@@ -1,4 +1,4 @@
-namespace PlayerWallet.Domain;
+namespace PlayerWallet.Console.Domain;
 
 /// <summary>Protects a wallet balance from invalid money movements.</summary>
 public sealed class Wallet

@@ -1,7 +1,7 @@
-using PlayerWallet.Application;
-using PlayerWallet.Domain;
+using PlayerWallet.Console.Application;
+using PlayerWallet.Console.Domain;
 
-namespace PlayerWallet.Infrastructure;
+namespace PlayerWallet.Console.Infrastructure;
 
 /// <summary>Stores independent wallet copies behind atomic dictionary operations.</summary>
 public sealed class InMemoryWalletRepository : IWalletRepository

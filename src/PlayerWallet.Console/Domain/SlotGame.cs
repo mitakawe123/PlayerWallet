@@ -1,4 +1,4 @@
-namespace PlayerWallet.Domain;
+namespace PlayerWallet.Console.Domain;
 
 /// <summary>Applies the fixed game rules and generates gross payouts in whole cents.</summary>
 public static class SlotGame

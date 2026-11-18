@@ -1,5 +1,5 @@
 using PlayerWallet.Application;
-using PlayerWallet.Domain;
+using PlayerWallet.Console.Domain;
 
 namespace PlayerWallet.Infrastructure.Tests;
 

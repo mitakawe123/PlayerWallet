@@ -1,4 +1,4 @@
-namespace PlayerWallet.Domain;
+namespace PlayerWallet.Console.Domain;
 
 /// <summary>Represents a nonnegative amount with cent precision.</summary>
 public readonly record struct Money
