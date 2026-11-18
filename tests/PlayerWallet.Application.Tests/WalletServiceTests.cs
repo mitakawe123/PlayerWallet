@@ -11,6 +11,7 @@ public sealed class WalletServiceTests
 
     /// <summary>Provides stakes outside the inclusive game limits.</summary>
     public static TheoryData<decimal> InvalidStakes => new() { 0.99m, 10.01m };
+
     /// <summary>Creates an empty wallet and persists successful operations.</summary>
     [Fact]
     public async Task SessionOperationsPersistExpectedBalances()
@@ -18,17 +19,17 @@ public sealed class WalletServiceTests
         var repository = new TestRepository();
         var service = new WalletService(repository);
         Guid id = await service.CreateWalletAsync();
-        Assert.Equal(0m, (await service.GetBalanceAsync(id)).Balance?.Amount);
-        Assert.Equal(10m, (await service.DepositAsync(id, 10)).Balance?.Amount);
+        Assert.Equal(0m, (await service.GetBalanceAsync(id)).Amount);
+        Assert.Equal(10m, (await service.DepositAsync(id, 10)).Balance.Amount);
 
         OperationResult bet = await service.PlaceBetAsync(id, 5);
-        Assert.Equal(WalletError.None, bet.Error);
-        decimal payout = bet.Payout?.Amount ?? 0m;
+        Assert.Null(bet.Error);
+        decimal payout = bet.Payout.Amount;
         Assert.InRange(payout, 0m, 50m);
-        Assert.Equal(10m - 5m + payout, bet.Balance?.Amount);
+        Assert.Equal(10m - 5m + payout, bet.Balance.Amount);
 
-        decimal remaining = bet.Balance?.Amount ?? 0m;
-        Assert.Equal(remaining - 5m, (await service.WithdrawAsync(id, 5)).Balance?.Amount);
+        decimal remaining = bet.Balance.Amount;
+        Assert.Equal(remaining - 5m, (await service.WithdrawAsync(id, 5)).Balance.Amount);
     }
 
     /// <summary>Commits the stake and gross payout as one balance change.</summary>
@@ -40,8 +41,8 @@ public sealed class WalletServiceTests
         Guid id = await service.CreateWalletAsync();
         await service.DepositAsync(id, 10);
         OperationResult result = await service.PlaceBetAsync(id, 5);
-        Assert.Equal(WalletError.None, result.Error);
-        Assert.Equal(10m - 5m + (result.Payout?.Amount ?? 0m), result.Balance?.Amount);
+        Assert.Null(result.Error);
+        Assert.Equal(10m - 5m + result.Payout.Amount, result.Balance.Amount);
         Assert.Equal(2, repository.Saves);
     }
 
@@ -54,21 +55,40 @@ public sealed class WalletServiceTests
         Guid id = await service.CreateWalletAsync();
         await service.DepositAsync(id, 5);
         OperationResult result = await service.PlaceBetAsync(id, 5);
-        Assert.Equal(WalletError.None, result.Error);
-        Assert.Equal(result.Payout?.Amount ?? 0m, result.Balance?.Amount);
+        Assert.Null(result.Error);
+        Assert.Equal(result.Payout.Amount, result.Balance.Amount);
         Assert.Equal(2, repository.Saves);
     }
 
-    /// <summary>Reports a missing wallet for every operation.</summary>
+    /// <summary>Creates time-ordered wallet identifiers.</summary>
     [Fact]
-    public async Task MissingWalletIsReportedForEveryOperation()
+    public async Task WalletIdentifiersAreVersion7()
+    {
+        var service = new WalletService(new TestRepository());
+        Guid id = await service.CreateWalletAsync();
+        Assert.Equal(7, id.Version);
+    }
+
+    /// <summary>Reports no payout for deposits and withdrawals.</summary>
+    [Fact]
+    public async Task NonBetOperationsReportNoPayout()
+    {
+        var service = new WalletService(new TestRepository());
+        Guid id = await service.CreateWalletAsync();
+        Assert.Equal(0m, (await service.DepositAsync(id, 10)).Payout.Amount);
+        Assert.Equal(0m, (await service.WithdrawAsync(id, 5)).Payout.Amount);
+    }
+
+    /// <summary>Treats a missing wallet as an unexpected failure rather than a user outcome.</summary>
+    [Fact]
+    public async Task MissingWalletIsAnUnexpectedFailure()
     {
         var service = new WalletService(new TestRepository());
         Guid id = Guid.NewGuid();
-        Assert.Equal(WalletError.WalletNotFound, (await service.GetBalanceAsync(id)).Error);
-        Assert.Equal(WalletError.WalletNotFound, (await service.DepositAsync(id, 5)).Error);
-        Assert.Equal(WalletError.WalletNotFound, (await service.WithdrawAsync(id, 5)).Error);
-        Assert.Equal(WalletError.WalletNotFound, (await service.PlaceBetAsync(id, 5)).Error);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.GetBalanceAsync(id));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.DepositAsync(id, 5));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.WithdrawAsync(id, 5));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.PlaceBetAsync(id, 5));
     }
 
     /// <summary>Rejects an overdraft without changing the stored balance.</summary>
@@ -81,7 +101,8 @@ public sealed class WalletServiceTests
         await service.DepositAsync(id, 10);
         OperationResult result = await service.WithdrawAsync(id, 11);
         Assert.Equal(WalletError.InsufficientFunds, result.Error);
-        Assert.Equal(10m, result.Balance?.Amount);
+        Assert.Equal(10m, result.Balance.Amount);
+        Assert.Equal(0m, result.Payout.Amount);
         Assert.Equal(1, repository.Saves);
     }
 
@@ -99,7 +120,7 @@ public sealed class WalletServiceTests
         Assert.Equal(0, repository.Saves);
     }
 
-    /// <summary>Rejects insufficient funds and missing wallets without saving.</summary>
+    /// <summary>Rejects insufficient funds and out-of-range stakes without saving.</summary>
     [Fact]
     public async Task RejectedBetsDoNotSave()
     {
@@ -108,7 +129,6 @@ public sealed class WalletServiceTests
         Guid id = await service.CreateWalletAsync();
         Assert.Equal(WalletError.InsufficientFunds, (await service.PlaceBetAsync(id, 5)).Error);
         Assert.Equal(WalletError.InvalidBet, (await service.PlaceBetAsync(id, 11)).Error);
-        Assert.Equal(WalletError.WalletNotFound, (await service.PlaceBetAsync(Guid.NewGuid(), 5)).Error);
         Assert.Equal(0, repository.Saves);
     }
 
@@ -125,19 +145,17 @@ public sealed class WalletServiceTests
         Assert.Equal(1, repository.Saves);
     }
 
-    /// <summary>Does not retry or expose an uncommitted payout after a conflict.</summary>
+    /// <summary>Does not retry a conflicted save and leaves the stored balance unchanged.</summary>
     [Fact]
-    public async Task ConflictDoesNotReroll()
+    public async Task ConflictIsNotRetried()
     {
         var repository = new TestRepository();
         var service = new WalletService(repository);
         Guid id = await service.CreateWalletAsync();
         await service.DepositAsync(id, 10);
         repository.Conflict = true;
-        OperationResult result = await service.PlaceBetAsync(id, 5);
-        Assert.Equal(WalletError.ConcurrencyConflict, result.Error);
-        Assert.Null(result.Payout);
-        Assert.Equal(10m, result.Balance?.Amount);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.PlaceBetAsync(id, 5));
+        Assert.Equal(10m, (await service.GetBalanceAsync(id)).Amount);
         Assert.Equal(2, repository.Saves);
     }
 
@@ -150,6 +168,6 @@ public sealed class WalletServiceTests
         Guid id = await service.CreateWalletAsync();
         repository.Fail = true;
         await Assert.ThrowsAsync<IOException>(() => service.DepositAsync(id, 10));
-        Assert.Equal(0m, (await service.GetBalanceAsync(id)).Balance?.Amount);
+        Assert.Equal(0m, (await service.GetBalanceAsync(id)).Amount);
     }
 }

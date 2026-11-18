@@ -17,9 +17,9 @@ public sealed class InMemoryWalletRepositoryTests
         Guid second = await service.CreateWalletAsync();
 
         Assert.NotEqual(first, second);
-        Assert.Equal(WalletError.None, (await service.DepositAsync(first, 25m)).Error);
-        Assert.Equal(25m, (await service.GetBalanceAsync(first)).Balance?.Amount);
-        Assert.Equal(0m, (await service.GetBalanceAsync(second)).Balance?.Amount);
+        Assert.Null((await service.DepositAsync(first, 25m)).Error);
+        Assert.Equal(25m, (await service.GetBalanceAsync(first)).Amount);
+        Assert.Equal(0m, (await service.GetBalanceAsync(second)).Amount);
     }
 
     /// <summary>Requires explicit saves and does not retain caller-owned wallet references.</summary>

@@ -25,8 +25,8 @@ public sealed class ConsoleApplication(WalletService service, TextReader input, 
 
                 if (!CommandParser.TryParse(line, out CommandKind command, out decimal amount))
                 {
-                    OperationResult balance = await service.GetBalanceAsync(id, cancellationToken);
-                    await WriteFailureAsync(ConsoleMessages.InvalidCommand, balance.Balance, cancellationToken);
+                    Money balance = await service.GetBalanceAsync(id, cancellationToken);
+                    await WriteFailureAsync(ConsoleMessages.InvalidCommand, balance, cancellationToken);
                     continue;
                 }
 
@@ -63,27 +63,6 @@ public sealed class ConsoleApplication(WalletService service, TextReader input, 
         }
     }
 
-    private async Task WriteResultAsync(
-        CommandKind command,
-        decimal amount,
-        OperationResult result,
-        CancellationToken cancellationToken)
-    {
-        if (result.Error is WalletError.WalletNotFound)
-        {
-            await output.WriteLineAsync(ConsoleMessages.WalletNotFound.AsMemory(), cancellationToken);
-            return;
-        }
-
-        if (result.Error is not WalletError.None)
-        {
-            await WriteFailureAsync(ErrorMessage(result.Error), result.Balance, cancellationToken);
-            return;
-        }
-
-        await output.WriteLineAsync(FormatSuccess(command, amount, result).AsMemory(), cancellationToken);
-    }
-
     /// <summary>Formats a successful deposit, withdrawal, win, or loss.</summary>
     /// <param name="command">The command that produced the result.</param>
     /// <param name="amount">The submitted amount.</param>
@@ -91,7 +70,7 @@ public sealed class ConsoleApplication(WalletService service, TextReader input, 
     /// <returns>The message shown for the operation.</returns>
     internal static string FormatSuccess(CommandKind command, decimal amount, OperationResult result)
     {
-        string balance = FormatBalance(result.Balance);
+        string balance = FormatAmount(result.Balance.Amount);
         return command switch
         {
             CommandKind.Deposit => string.Format(
@@ -104,10 +83,10 @@ public sealed class ConsoleApplication(WalletService service, TextReader input, 
                 ConsoleMessages.WithdrawalFormat,
                 FormatAmount(amount),
                 balance),
-            CommandKind.Bet when result.Payout is { } payout => string.Format(
+            CommandKind.Bet when result.Payout.Amount > 0 => string.Format(
                 CultureInfo.InvariantCulture,
                 ConsoleMessages.WinFormat,
-                FormatAmount(payout.Amount),
+                FormatAmount(result.Payout.Amount),
                 balance),
             CommandKind.Bet => string.Format(
                 CultureInfo.InvariantCulture,
@@ -117,28 +96,29 @@ public sealed class ConsoleApplication(WalletService service, TextReader input, 
         };
     }
 
-    private Task WriteFailureAsync(string message, Money? balance, CancellationToken cancellationToken) =>
+    private async Task WriteResultAsync(
+        CommandKind command,
+        decimal amount,
+        OperationResult result,
+        CancellationToken cancellationToken)
+    {
+        if (result.Error is { } error)
+        {
+            await WriteFailureAsync(ConsoleMessages.For(error), result.Balance, cancellationToken);
+            return;
+        }
+
+        await output.WriteLineAsync(FormatSuccess(command, amount, result).AsMemory(), cancellationToken);
+    }
+
+    private Task WriteFailureAsync(string message, Money balance, CancellationToken cancellationToken) =>
         output.WriteLineAsync(
             string.Format(
                 CultureInfo.InvariantCulture,
                 ConsoleMessages.FailureFormat,
                 message,
-                FormatBalance(balance)).AsMemory(),
+                FormatAmount(balance.Amount)).AsMemory(),
             cancellationToken);
-
-    private static string ErrorMessage(WalletError error) => error switch
-    {
-        WalletError.InvalidAmount => ConsoleMessages.InvalidAmount,
-        WalletError.InsufficientFunds => ConsoleMessages.InsufficientFunds,
-        WalletError.InvalidBet => ConsoleMessages.InvalidBet,
-        WalletError.BalanceOverflow => ConsoleMessages.BalanceOverflow,
-        WalletError.ConcurrencyConflict => ConsoleMessages.ConcurrencyConflict,
-        _ => ConsoleMessages.WalletNotFound,
-    };
-
-    private static string FormatBalance(Money? balance) => balance is { } money
-        ? FormatAmount(money.Amount)
-        : ConsoleMessages.BalanceUnavailable;
 
     private static string FormatAmount(decimal amount) => amount == decimal.Truncate(amount)
         ? amount.ToString(ConsoleMessages.WholeMoneyFormat, CultureInfo.InvariantCulture)

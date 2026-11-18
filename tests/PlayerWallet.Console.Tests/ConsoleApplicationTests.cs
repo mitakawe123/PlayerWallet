@@ -69,37 +69,47 @@ public sealed class ConsoleApplicationTests
             ConsoleApplication.FormatSuccess(
                 CommandKind.Deposit,
                 10m,
-                new OperationResult(WalletError.None, new Money(10m))));
+                OperationResult.Success(new Money(10m))));
         Assert.Equal(
             "Your deposit of $10.50 was successful. Your current balance is: $10.50",
             ConsoleApplication.FormatSuccess(
                 CommandKind.Deposit,
                 10.5m,
-                new OperationResult(WalletError.None, new Money(10.5m))));
+                OperationResult.Success(new Money(10.5m))));
         Assert.Equal(
             "Your withdrawal of $40.35 was successful. Your current balance is: $0",
             ConsoleApplication.FormatSuccess(
                 CommandKind.Withdraw,
                 40.35m,
-                new OperationResult(WalletError.None, new Money(0m))));
+                OperationResult.Success(new Money(0m))));
         Assert.Equal(
             "Congrats - you won $35.35! Your current balance is: $40.35",
             ConsoleApplication.FormatSuccess(
                 CommandKind.Bet,
                 5m,
-                new OperationResult(WalletError.None, new Money(40.35m), new Money(35.35m))));
+                OperationResult.Success(new Money(40.35m), new Money(35.35m))));
         Assert.Equal(
             "Congrats - you won $0.15! Your current balance is: $0.15",
             ConsoleApplication.FormatSuccess(
                 CommandKind.Bet,
                 5m,
-                new OperationResult(WalletError.None, new Money(0.15m), new Money(0.15m))));
+                OperationResult.Success(new Money(0.15m), new Money(0.15m))));
         Assert.Equal(
             "No luck this time! Your current balance is: $5",
             ConsoleApplication.FormatSuccess(
                 CommandKind.Bet,
                 5m,
-                new OperationResult(WalletError.None, new Money(5m))));
+                OperationResult.Success(new Money(5m))));
+    }
+
+    /// <summary>Fails when a wallet rule is added without a message.</summary>
+    [Fact]
+    public void EveryWalletRuleHasAMessage()
+    {
+        foreach (WalletError error in Enum.GetValues<WalletError>())
+        {
+            Assert.False(string.IsNullOrWhiteSpace(ConsoleMessages.For(error)), error.ToString());
+        }
     }
 
     /// <summary>Runs a session, recovers from errors, and exits cleanly.</summary>
