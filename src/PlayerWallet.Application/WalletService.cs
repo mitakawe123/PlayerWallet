@@ -105,7 +105,7 @@ public sealed class WalletService(IWalletRepository repository, SlotGame game)
             return new OperationResult(error, wallet.Balance);
         }
 
-        return await SaveAsync(wallet, cancellationToken, payout);
+        return await SaveAsync(wallet, cancellationToken, payout.Amount is 0 ? null : payout);
     }
 
     private async Task<OperationResult> SaveAsync(

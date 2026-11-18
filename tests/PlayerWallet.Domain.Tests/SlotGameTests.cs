@@ -3,14 +3,20 @@ namespace PlayerWallet.Domain.Tests;
 /// <summary>Verifies exact probability boundaries and payout endpoints.</summary>
 public sealed class SlotGameTests
 {
+    /// <summary>Provides category boundaries and the expected payouts for a $5 stake.</summary>
+    public static TheoryData<int, bool, decimal> Outcomes => new()
+    {
+        { 0, false, 0m },
+        { 49, false, 0m },
+        { 50, false, 0.01m },
+        { 89, true, 10m },
+        { 90, false, 10.01m },
+        { 99, true, 50m },
+    };
+
     /// <summary>Checks both edges of every outcome category and payout range.</summary>
     [Theory]
-    [InlineData(0, false, 0)]
-    [InlineData(49, false, 0)]
-    [InlineData(50, false, 0.01)]
-    [InlineData(89, true, 10)]
-    [InlineData(90, false, 10.01)]
-    [InlineData(99, true, 50)]
+    [MemberData(nameof(Outcomes))]
     public void OutcomeBoundariesAreExact(int category, bool upper, decimal expected)
     {
         var random = new BoundaryRandom(category, upper);

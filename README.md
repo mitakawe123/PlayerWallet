@@ -1,6 +1,6 @@
 # PlayerWallet
 
-A .NET 10 console wallet exercise, organized into Domain, Application,
+A .NET 11 console wallet exercise, organized into Domain, Application,
 Infrastructure, and Console projects.
 
 ## Current status
@@ -10,18 +10,29 @@ an in-memory wallet. Each session starts at zero and exits on `exit` or EOF.
 The tests cover domain rules, use cases, repository concurrency, and console flows.
 
 ```text
+Please, submit action:
 deposit 10
+Your deposit of $10 was successful. Your current balance is: $10
+
+Please, submit action:
 bet 5
-withdraw 2
+Congrats - you won $35.35! Your current balance is: $40.35
+
+Please, submit action:
 exit
+Thank you for playing! Hope to see you again soon.
+
+Press any key to exit.
 ```
 
-Amounts use a decimal point and cent precision. Invalid input does not terminate
-the session or change the balance. Payouts are gross winnings, not net profit.
+Amounts use a decimal point and cent precision. Whole amounts are shown without
+cents (for example `$10`), and other amounts keep two decimal places. Invalid
+input does not terminate the session or change the balance. Payouts are gross
+winnings, not net profit.
 
 ## Prerequisites
 
-- .NET SDK 10.0.101 or a later patch in the same feature band, as specified by
+- .NET SDK 11.0.100 or a later patch in the same feature band, as specified by
   `global.json`. Update this pin deliberately when upgrading the toolchain.
 - Access to NuGet.org for package restore and security advisory checks.
 
@@ -75,18 +86,23 @@ balance updates must be committed atomically.
 ### Agreed initial behavior
 
 - Commands: `deposit <amount>`, `withdraw <amount>`, `bet <amount>`, `exit`.
-- Use `decimal`, accept positive amounts with cent precision, and format balances
-  with two decimal places. Use an explicit culture for decimal-point input.
+- Use `decimal`, accept positive amounts with cent precision, and format whole
+  amounts without cents and other amounts with two decimal places. Use an
+  explicit culture for decimal-point input.
 - Reject insufficient funds, fractional cents, invalid commands, and overflow
   without changing the balance. Show the unchanged balance after rejection.
 - Bet limits are inclusive: $1.00 through $10.00.
 - Each round independently selects a category: 50% loss, 40% small payout,
   10% large payout. These are probabilities, not quotas over a sequence of bets.
-- Proposed payout interpretation: loss pays zero; small payouts are uniformly
-  selected in whole cents from $0.01 through twice the bet; large payouts are
-  uniformly selected in whole cents above twice the bet through ten times the
-  bet. This distribution is an explicit assumption because the brief does not
-  specify the distribution within each category.
+- Payout interpretation: loss pays zero; small payouts are uniformly selected in
+  whole cents from $0.01 through twice the bet; large payouts are uniformly
+  selected in whole cents above twice the bet through ten times the bet. The
+  brief does not specify the distribution within each category, so uniform
+  sampling is used. These bands and percentages imply an expected return of about
+  100% of the stake, so no house edge is assumed.
+- A zero payout is reported as a loss; any positive payout is reported as a win.
+  Because a small payout can be below the stake, a small win can still reduce the
+  balance; the rules fix the payout band, not a minimum profit.
 - Payout means gross winnings: `new balance = old balance - bet + payout`.
 - Validate the proposed result before committing a balance change.
 - Exit and end-of-input both terminate cleanly.
