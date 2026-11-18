@@ -6,7 +6,7 @@ in-memory wallet that starts at zero for each session.
 ## Run
 
 ```sh
-dotnet restore PlayerWallet.slnx --locked-mode
+dotnet restore PlayerWallet.slnx
 dotnet build PlayerWallet.slnx --configuration Release
 dotnet test PlayerWallet.slnx --configuration Release --no-build
 dotnet run --project src/PlayerWallet.Console --configuration Release

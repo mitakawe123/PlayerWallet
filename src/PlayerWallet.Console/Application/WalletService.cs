@@ -14,7 +14,7 @@ public sealed class WalletService(IWalletRepository repository)
     /// <summary>Creates a new empty wallet for a session.</summary>
     public async Task<Guid> CreateWalletAsync(CancellationToken cancellationToken = default)
     {
-        var wallet = new Wallet(Guid.NewGuid(), default);
+        var wallet = new Wallet(Guid.CreateVersion7(), default);
         if (!await _repository.CreateAsync(wallet, cancellationToken))
         {
             throw new InvalidOperationException(DuplicateWalletMessage);

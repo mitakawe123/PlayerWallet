@@ -60,6 +60,15 @@ public sealed class WalletServiceTests
         Assert.Equal(2, repository.Saves);
     }
 
+    /// <summary>Creates time-ordered wallet identifiers.</summary>
+    [Fact]
+    public async Task WalletIdentifiersAreVersion7()
+    {
+        var service = new WalletService(new TestRepository());
+        Guid id = await service.CreateWalletAsync();
+        Assert.Equal(7, id.Version);
+    }
+
     /// <summary>Reports no payout for deposits and withdrawals.</summary>
     [Fact]
     public async Task NonBetOperationsReportNoPayout()
