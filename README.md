@@ -28,12 +28,14 @@ Amounts use a decimal point and cent precision. Invalid input prints a message,
 leaves the balance unchanged, and keeps the session running. `exit` and
 end-of-input end the session.
 
-Every command carries an operation identifier, and the balance change and its
-recorded result commit together in a single store call. Replaying the same
-identifier returns the original result instead of applying it twice, so a retry
-cannot double-apply a deposit or pay out a bet twice. That call is the only
-atomic unit the service relies on, so a database store can implement it with one
-transaction and a unique index on the operation identifier.
+Each command is a new wallet operation. Two `deposit 10` commands credit $20;
+neither charges a payment method. The store updates the balance atomically
+without keeping a history of commands.
+
+If deposits later take real payments, persist a pending deposit before charging
+and use its ID as the provider's idempotency key. Reconcile an unknown charge
+outcome with the provider. Once confirmed, credit the wallet and mark the
+deposit completed in one database transaction, only if it is still pending.
 
 ## Game rules
 

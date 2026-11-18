@@ -2,7 +2,7 @@ using PlayerWallet.Console.Domain;
 
 namespace PlayerWallet.Console.Application;
 
-/// <summary>Coordinates idempotent wallet operations against an atomic store.</summary>
+/// <summary>Coordinates wallet operations against an atomic store.</summary>
 /// <remarks>
 /// Each mutating method hands the store one callback instead of a load/save pair. The store
 /// decides how to make that callback atomic, so moving to a database changes the store only.
@@ -35,15 +35,13 @@ public sealed class WalletService(IWalletRepository repository)
     public async Task<Money> GetBalanceAsync(Guid id, CancellationToken cancellationToken = default) =>
         (await LoadAsync(id, cancellationToken)).Balance;
 
-    /// <summary>Deposits a positive cent-precision amount at most once per operation identifier.</summary>
+    /// <summary>Deposits a positive cent-precision amount.</summary>
     /// <param name="id">The wallet identifier.</param>
-    /// <param name="operationId">The identifier that makes this operation safe to replay.</param>
     /// <param name="amount">The amount to add.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
-    /// <returns>The committed result, or the result recorded for a replay.</returns>
+    /// <returns>The result of the wallet operation.</returns>
     public async Task<OperationResult> DepositAsync(
         Guid id,
-        Guid operationId,
         decimal amount,
         CancellationToken cancellationToken = default)
     {
@@ -55,22 +53,19 @@ public sealed class WalletService(IWalletRepository repository)
         var credit = new Money(amount);
         return await _repository.ExecuteAsync(
             id,
-            operationId,
             wallet => wallet.Deposit(credit) is { } error
                 ? OperationResult.Rejected(error, wallet.Balance)
                 : OperationResult.Success(wallet.Balance),
             cancellationToken);
     }
 
-    /// <summary>Withdraws a positive amount at most once per operation identifier.</summary>
+    /// <summary>Withdraws a positive amount.</summary>
     /// <param name="id">The wallet identifier.</param>
-    /// <param name="operationId">The identifier that makes this operation safe to replay.</param>
     /// <param name="amount">The amount to remove.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
-    /// <returns>The committed result, or the result recorded for a replay.</returns>
+    /// <returns>The result of the wallet operation.</returns>
     public async Task<OperationResult> WithdrawAsync(
         Guid id,
-        Guid operationId,
         decimal amount,
         CancellationToken cancellationToken = default)
     {
@@ -82,22 +77,19 @@ public sealed class WalletService(IWalletRepository repository)
         var debit = new Money(amount);
         return await _repository.ExecuteAsync(
             id,
-            operationId,
             wallet => wallet.Withdraw(debit) is { } error
                 ? OperationResult.Rejected(error, wallet.Balance)
                 : OperationResult.Success(wallet.Balance),
             cancellationToken);
     }
 
-    /// <summary>Plays and commits one round at most once per operation identifier.</summary>
+    /// <summary>Plays and commits one round.</summary>
     /// <param name="id">The wallet identifier.</param>
-    /// <param name="operationId">The identifier that makes this operation safe to replay.</param>
     /// <param name="amount">The stake, within the game limits.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
-    /// <returns>The committed result, or the result recorded for a replay.</returns>
+    /// <returns>The result of the wallet operation.</returns>
     public async Task<OperationResult> PlaceBetAsync(
         Guid id,
-        Guid operationId,
         decimal amount,
         CancellationToken cancellationToken = default)
     {
@@ -115,13 +107,9 @@ public sealed class WalletService(IWalletRepository repository)
             return await RejectAsync(id, WalletError.InvalidBet, cancellationToken);
         }
 
-        // Drawn once, outside the store: the store never replays the callback, and no lock or
-        // transaction is held while the game runs. A caller retrying with the same operation
-        // identifier gets the recorded payout instead of a second draw.
         Money payout = SlotGame.Play(stake);
         return await _repository.ExecuteAsync(
             id,
-            operationId,
             wallet => wallet.SettleBet(stake, payout) is { } error
                 ? OperationResult.Rejected(error, wallet.Balance)
                 : OperationResult.Success(wallet.Balance, payout),

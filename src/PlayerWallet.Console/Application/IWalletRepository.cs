@@ -2,7 +2,7 @@ using PlayerWallet.Console.Domain;
 
 namespace PlayerWallet.Console.Application;
 
-/// <summary>Stores wallets and the results of applied operations as one unit of work.</summary>
+/// <summary>Stores wallet balances as one unit of work.</summary>
 /// <remarks>
 /// The contract is deliberately a single atomic call rather than load/save pairs, so an
 /// implementation backed by a database can map <see cref="ExecuteAsync"/> onto one
@@ -22,20 +22,18 @@ public interface IWalletRepository
     /// <returns>A detached copy of the stored wallet.</returns>
     Task<Wallet?> GetAsync(Guid id, CancellationToken cancellationToken = default);
 
-    /// <summary>Applies one operation to a wallet at most once, atomically.</summary>
+    /// <summary>Applies one operation to a wallet atomically.</summary>
     /// <param name="id">The wallet identifier.</param>
-    /// <param name="operationId">The identifier that makes this operation safe to replay.</param>
     /// <param name="apply">
     /// Computes the result from a detached copy of the wallet. It runs inside the atomic
     /// section, so it must be synchronous, must not perform I/O, and must not call back
     /// into this store. It must leave the wallet unchanged when it returns a rejection.
     /// </param>
     /// <param name="cancellationToken">Cancels the operation.</param>
-    /// <returns>The committed result, or the result recorded for a replay.</returns>
+    /// <returns>The result of the wallet operation.</returns>
     /// <exception cref="InvalidOperationException">The wallet does not exist.</exception>
     Task<OperationResult> ExecuteAsync(
         Guid id,
-        Guid operationId,
         Func<Wallet, OperationResult> apply,
         CancellationToken cancellationToken = default);
 }

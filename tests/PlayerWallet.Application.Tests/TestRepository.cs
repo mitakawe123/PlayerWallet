@@ -5,7 +5,6 @@ namespace PlayerWallet.Application.Tests;
 
 internal sealed class TestRepository : IWalletRepository
 {
-    private readonly Dictionary<Guid, OperationResult> _applied = [];
     private Guid _id;
     private Money _balance;
 
@@ -27,21 +26,15 @@ internal sealed class TestRepository : IWalletRepository
     public Task<Wallet?> GetAsync(Guid id, CancellationToken cancellationToken = default) =>
         Task.FromResult<Wallet?>(id == _id ? new Wallet(id, _balance) : null);
 
-    /// <summary>Simulates one atomic commit, a replay, or a configured storage failure.</summary>
+    /// <summary>Simulates one atomic commit or a configured storage failure.</summary>
     public Task<OperationResult> ExecuteAsync(
         Guid id,
-        Guid operationId,
         Func<Wallet, OperationResult> apply,
         CancellationToken cancellationToken = default)
     {
         if (Fail)
         {
             throw new IOException("Storage unavailable.");
-        }
-
-        if (_applied.TryGetValue(operationId, out OperationResult replay))
-        {
-            return Task.FromResult(replay);
         }
 
         if (id != _id)
@@ -57,7 +50,6 @@ internal sealed class TestRepository : IWalletRepository
         }
 
         _balance = candidate.Balance;
-        _applied[operationId] = result;
         Saves++;
         return Task.FromResult(result);
     }
