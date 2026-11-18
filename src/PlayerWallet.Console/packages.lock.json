@@ -13,22 +13,6 @@
         "requested": "[1.3.180, )",
         "resolved": "1.3.180",
         "contentHash": "/TDyrO3tUJOsnyTazvaX+qwwBt4aixQLNLtxmkyWQZE94IOZ9PnClHrwKUVn/NSXdXUUWrKMHTtlxUkZ1F8JWg=="
-      },
-      "playerwallet.application": {
-        "type": "Project",
-        "dependencies": {
-          "PlayerWallet.Domain": "[1.0.0, )"
-        }
-      },
-      "playerwallet.domain": {
-        "type": "Project"
-      },
-      "playerwallet.infrastructure": {
-        "type": "Project",
-        "dependencies": {
-          "PlayerWallet.Application": "[1.0.0, )",
-          "PlayerWallet.Domain": "[1.0.0, )"
-        }
       }
     }
   }

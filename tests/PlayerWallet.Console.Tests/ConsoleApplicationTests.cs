@@ -5,7 +5,7 @@ using PlayerWallet.Infrastructure;
 
 namespace PlayerWallet.Console.Tests;
 
-/// <summary>Verifies command parsing and complete console sessions.</summary>
+/// <summary>Verifies command parsing, result formatting, and complete console sessions.</summary>
 public sealed class ConsoleApplicationTests
 {
     /// <summary>Rejects malformed commands and ambiguous amount notation.</summary>
@@ -45,35 +45,56 @@ public sealed class ConsoleApplicationTests
         Assert.Equal(CommandKind.Exit, command);
     }
 
-    /// <summary>Runs the documented example, recovers from errors, and exits cleanly.</summary>
+    /// <summary>Formats deposit, withdrawal, win, and loss messages as the brief shows.</summary>
+    [Fact]
+    public void ResultFormattingMatchesTheBrief()
+    {
+        Assert.Equal(
+            "Your deposit of $10 was successful. Your current balance is: $10",
+            ConsoleApplication.FormatSuccess(
+                CommandKind.Deposit,
+                10m,
+                new OperationResult(WalletError.None, new Money(10m))));
+        Assert.Equal(
+            "Your withdrawal of $40.35 was successful. Your current balance is: $0",
+            ConsoleApplication.FormatSuccess(
+                CommandKind.Withdraw,
+                40.35m,
+                new OperationResult(WalletError.None, new Money(0m))));
+        Assert.Equal(
+            "Congrats - you won $35.35! Your current balance is: $40.35",
+            ConsoleApplication.FormatSuccess(
+                CommandKind.Bet,
+                5m,
+                new OperationResult(WalletError.None, new Money(40.35m), new Money(35.35m))));
+        Assert.Equal(
+            "No luck this time! Your current balance is: $5",
+            ConsoleApplication.FormatSuccess(
+                CommandKind.Bet,
+                5m,
+                new OperationResult(WalletError.None, new Money(5m))));
+    }
+
+    /// <summary>Runs a session, recovers from errors, and exits cleanly.</summary>
     [Fact]
     public async Task FullSessionShowsCommittedBalances()
     {
-        using var input = new StringReader("deposit 10\nbet 5\nwithdraw 100\nwat\nwithdraw 40.35\nexit\ndeposit 5\n");
+        using var input = new StringReader("deposit 10\nbet 5\nwithdraw 100\nwat\nwithdraw 5\nexit\ndeposit 5\n");
         using var output = new StringWriter(CultureInfo.InvariantCulture);
-        var service = new WalletService(new InMemoryWalletRepository(), new SlotGame(new GameRules(), new ExampleRandom()));
+        var service = new WalletService(new InMemoryWalletRepository());
         var app = new ConsoleApplication(service, input, output);
         Assert.Equal(0, await app.RunAsync());
         string transcript = output.ToString();
         Assert.Contains("Your deposit of $10 was successful. Your current balance is: $10", transcript, StringComparison.Ordinal);
-        Assert.Contains("Congrats - you won $35.35! Your current balance is: $40.35", transcript, StringComparison.Ordinal);
-        Assert.Contains("Insufficient funds. Your current balance is: $40.35", transcript, StringComparison.Ordinal);
+        Assert.True(
+            transcript.Contains("Congrats - you won $", StringComparison.Ordinal)
+            ^ transcript.Contains("No luck this time!", StringComparison.Ordinal));
+        Assert.Contains("Insufficient funds. Your current balance is: $", transcript, StringComparison.Ordinal);
         Assert.Contains("Invalid command.", transcript, StringComparison.Ordinal);
-        Assert.Contains("Your withdrawal of $40.35 was successful. Your current balance is: $0", transcript, StringComparison.Ordinal);
+        Assert.Contains("Your withdrawal of $5 was successful. Your current balance is: $", transcript, StringComparison.Ordinal);
         Assert.Contains("Thank you for playing!", transcript, StringComparison.Ordinal);
         Assert.EndsWith("Press any key to exit." + Environment.NewLine, transcript, StringComparison.Ordinal);
         Assert.DoesNotContain("Your deposit of $5", transcript, StringComparison.Ordinal);
-    }
-
-    /// <summary>Shows a loss without reporting a zero payout as a win.</summary>
-    [Fact]
-    public async Task LosingBetShowsNoLuckMessage()
-    {
-        using var input = new StringReader("deposit 10\nbet 5\nexit\n");
-        using var output = new StringWriter(CultureInfo.InvariantCulture);
-        var service = new WalletService(new InMemoryWalletRepository(), new SlotGame(new GameRules(), new LosingRandom()));
-        Assert.Equal(0, await new ConsoleApplication(service, input, output).RunAsync());
-        Assert.Contains("No luck this time! Your current balance is: $5", output.ToString(), StringComparison.Ordinal);
     }
 
     /// <summary>Exits cleanly when cancelled while waiting for a command.</summary>
@@ -83,7 +104,7 @@ public sealed class ConsoleApplicationTests
         using var cancellation = new CancellationTokenSource();
         using var input = new BlockingCommandReader();
         using var output = new StringWriter(CultureInfo.InvariantCulture);
-        var service = new WalletService(new InMemoryWalletRepository(), new SlotGame(new GameRules(), new ExampleRandom()));
+        var service = new WalletService(new InMemoryWalletRepository());
         var app = new ConsoleApplication(service, input, output);
         var timeout = TimeSpan.FromSeconds(5);
 
@@ -105,7 +126,7 @@ public sealed class ConsoleApplicationTests
     {
         using var input = new StringReader(commands);
         using var output = new StringWriter(CultureInfo.InvariantCulture);
-        var service = new WalletService(new InMemoryWalletRepository(), new SlotGame(new GameRules(), new ExampleRandom()));
+        var service = new WalletService(new InMemoryWalletRepository());
         Assert.Equal(0, await new ConsoleApplication(service, input, output).RunAsync());
         Assert.Contains("Thank you for playing!", output.ToString(), StringComparison.Ordinal);
     }

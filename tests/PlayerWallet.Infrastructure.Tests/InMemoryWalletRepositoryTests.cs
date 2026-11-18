@@ -11,7 +11,7 @@ public sealed class InMemoryWalletRepositoryTests
     public async Task DepositOnlyChangesTheTargetWallet()
     {
         var repository = new InMemoryWalletRepository();
-        var service = new WalletService(repository, new SlotGame(new GameRules(), new SystemRandomSource()));
+        var service = new WalletService(repository);
         Guid first = await service.CreateWalletAsync();
         Guid second = await service.CreateWalletAsync();
 

@@ -40,10 +40,9 @@ public sealed class Wallet
     }
 
     /// <summary>Checks whether the wallet can cover a positive stake within the game limits.</summary>
-    public WalletError ValidateBet(Money stake, GameRules rules)
+    public WalletError ValidateBet(Money stake)
     {
-        ArgumentNullException.ThrowIfNull(rules);
-        if (stake.Amount < rules.MinimumBet || stake.Amount > rules.MaximumBet)
+        if (stake.Amount < SlotGame.MinimumBet || stake.Amount > SlotGame.MaximumBet)
         {
             return WalletError.InvalidBet;
         }
@@ -52,9 +51,9 @@ public sealed class Wallet
     }
 
     /// <summary>Applies a stake and gross payout as one balance change.</summary>
-    public WalletError SettleBet(Money stake, Money payout, GameRules rules)
+    public WalletError SettleBet(Money stake, Money payout)
     {
-        WalletError error = ValidateBet(stake, rules);
+        WalletError error = ValidateBet(stake);
         return error is WalletError.None ? SetBalance(Balance.Amount - stake.Amount, payout.Amount) : error;
     }
 

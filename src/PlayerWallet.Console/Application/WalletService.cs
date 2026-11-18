@@ -3,12 +3,11 @@ using PlayerWallet.Domain;
 namespace PlayerWallet.Application;
 
 /// <summary>Coordinates wallet operations and explicit persistence.</summary>
-public sealed class WalletService(IWalletRepository repository, SlotGame game)
+public sealed class WalletService(IWalletRepository repository)
 {
     private const string DuplicateWalletMessage = "A new wallet identifier already exists.";
 
     private readonly IWalletRepository _repository = repository ?? throw new ArgumentNullException(nameof(repository));
-    private readonly SlotGame _game = game ?? throw new ArgumentNullException(nameof(game));
 
     /// <summary>Creates a new empty wallet for a session.</summary>
     public async Task<Guid> CreateWalletAsync(CancellationToken cancellationToken = default)
@@ -92,14 +91,14 @@ public sealed class WalletService(IWalletRepository repository, SlotGame game)
         }
 
         var stake = new Money(amount);
-        WalletError error = wallet.ValidateBet(stake, _game.Rules);
+        WalletError error = wallet.ValidateBet(stake);
         if (error is not WalletError.None)
         {
             return new OperationResult(error, wallet.Balance);
         }
 
-        Money payout = _game.Play(stake);
-        error = wallet.SettleBet(stake, payout, _game.Rules);
+        Money payout = SlotGame.Play(stake);
+        error = wallet.SettleBet(stake, payout);
         if (error is not WalletError.None)
         {
             return new OperationResult(error, wallet.Balance);

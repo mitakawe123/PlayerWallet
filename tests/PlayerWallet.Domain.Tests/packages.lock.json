@@ -106,7 +106,7 @@
           "xunit.extensibility.core": "[2.9.3]"
         }
       },
-      "playerwallet.domain": {
+      "playerwallet.console": {
         "type": "Project"
       }
     }

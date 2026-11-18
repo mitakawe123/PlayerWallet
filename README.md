@@ -54,15 +54,16 @@ To apply formatting, run `dotnet format PlayerWallet.slnx --no-restore`.
 
 ## Architecture
 
-| Project | Responsibility | Direct project references |
-| --- | --- | --- |
-| Domain | Wallet invariants, money and game rules | None |
-| Application | Use cases, storage contracts, operation results | Domain |
-| Infrastructure | In-memory repository and random source adapters | Application, Domain |
-| Console | Input/output and startup composition | Application, Infrastructure |
+One console project, split by folder:
 
-Infrastructure is referenced by Console only to wire implementations at startup.
-Command handling should use Application contracts. Domain has no runtime package
+| Folder | Responsibility |
+| --- | --- |
+| `Domain/` | Wallet invariants, money, and fixed game rules |
+| `Application/` | Use cases, storage contracts, operation results |
+| `Infrastructure/` | In-memory repository |
+| Project root | Input/output and startup composition |
+
+Command handling uses Application contracts. Domain has no runtime package
 dependencies. Analyzer packages are development-only dependencies.
 
 ### Persistence contract
@@ -162,8 +163,8 @@ explain the member rather than merely repeating its name.
 
 `Money.MaximumAmount` is `decimal.MaxValue / 100`, ensuring all supported amounts
 retain exact cents, even near the upper limit. Values outside that range are
-rejected. Game limits are validated and capped at $1,000,000 so payout sampling
-fits integer cent bounds; the default bet range remains $1 through $10.
+rejected. Game limits are fixed at $1 through $10, and payout sampling uses
+integer cent bounds.
 
 The repository is process-local and intentionally loses data on exit. Its lock
 covers snapshot reads and conditional saves, not the whole use case. Conflicting

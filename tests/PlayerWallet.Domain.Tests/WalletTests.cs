@@ -88,7 +88,7 @@ public sealed class WalletTests
     public void BetLimitsAreInclusive(decimal stake, WalletError expected)
     {
         var wallet = new Wallet(Guid.NewGuid(), new Money(20));
-        Assert.Equal(expected, wallet.ValidateBet(new Money(stake), new GameRules()));
+        Assert.Equal(expected, wallet.ValidateBet(new Money(stake)));
         Assert.Equal(20m, wallet.Balance.Amount);
     }
 
@@ -98,7 +98,7 @@ public sealed class WalletTests
     public void SettlementUsesGrossPayout(decimal payout, decimal expected)
     {
         var wallet = new Wallet(Guid.NewGuid(), new Money(10));
-        Assert.Equal(WalletError.None, wallet.SettleBet(new Money(5), new Money(payout), new GameRules()));
+        Assert.Equal(WalletError.None, wallet.SettleBet(new Money(5), new Money(payout)));
         Assert.Equal(expected, wallet.Balance.Amount);
     }
 
@@ -107,7 +107,7 @@ public sealed class WalletTests
     public void SettlementOverflowIsAtomic()
     {
         var wallet = new Wallet(Guid.NewGuid(), new Money(Money.MaximumAmount));
-        Assert.Equal(WalletError.BalanceOverflow, wallet.SettleBet(new Money(1), new Money(10), new GameRules()));
+        Assert.Equal(WalletError.BalanceOverflow, wallet.SettleBet(new Money(1), new Money(10)));
         Assert.Equal(Money.MaximumAmount, wallet.Balance.Amount);
     }
 }

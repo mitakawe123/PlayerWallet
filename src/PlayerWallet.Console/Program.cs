@@ -1,11 +1,9 @@
 using PlayerWallet.Application;
 using PlayerWallet.Console;
-using PlayerWallet.Domain;
 using PlayerWallet.Infrastructure;
 
 var repository = new InMemoryWalletRepository();
-var game = new SlotGame(new GameRules(), new SystemRandomSource());
-var service = new WalletService(repository, game);
+var service = new WalletService(repository);
 var application = new ConsoleApplication(service, Console.In, Console.Out);
 
 using var cancellation = new CancellationTokenSource();

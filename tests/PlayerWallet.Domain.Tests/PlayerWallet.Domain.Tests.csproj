@@ -1,5 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
-    <ProjectReference Include="../../src/PlayerWallet.Domain/PlayerWallet.Domain.csproj" />
+    <ProjectReference Include="../../src/PlayerWallet.Console/PlayerWallet.Console.csproj" />
   </ItemGroup>
 </Project>

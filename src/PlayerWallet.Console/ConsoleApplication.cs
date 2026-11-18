@@ -81,8 +81,18 @@ public sealed class ConsoleApplication(WalletService service, TextReader input, 
             return;
         }
 
+        await output.WriteLineAsync(FormatSuccess(command, amount, result).AsMemory(), cancellationToken);
+    }
+
+    /// <summary>Formats a successful deposit, withdrawal, win, or loss.</summary>
+    /// <param name="command">The command that produced the result.</param>
+    /// <param name="amount">The submitted amount.</param>
+    /// <param name="result">The successful operation result.</param>
+    /// <returns>The message shown for the operation.</returns>
+    internal static string FormatSuccess(CommandKind command, decimal amount, OperationResult result)
+    {
         string balance = FormatBalance(result.Balance);
-        string message = command switch
+        return command switch
         {
             CommandKind.Deposit => string.Format(
                 CultureInfo.InvariantCulture,
@@ -105,8 +115,6 @@ public sealed class ConsoleApplication(WalletService service, TextReader input, 
                 balance),
             _ => throw new InvalidOperationException(ConsoleMessages.InvalidCommand),
         };
-
-        await output.WriteLineAsync(message.AsMemory(), cancellationToken);
     }
 
     private Task WriteFailureAsync(string message, Money? balance, CancellationToken cancellationToken) =>
