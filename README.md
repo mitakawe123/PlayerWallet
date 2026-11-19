@@ -85,8 +85,9 @@ Thank you for playing! Hope to see you again soon.
 Press any key to exit.
 ```
 
-Whole amounts print without cents (`$10`); other amounts keep two decimals
-(`$35.35`).
+Submitted amounts echo the precision the player typed, so `withdraw 44.00`
+reports `$44.00` while `deposit 10` reports `$10`. Balances print whole amounts
+without cents (`$10`) and other amounts with two decimals (`$35.35`).
 
 ## Structure
 

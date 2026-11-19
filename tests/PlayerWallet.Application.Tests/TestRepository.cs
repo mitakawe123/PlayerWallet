@@ -19,7 +19,7 @@ internal sealed class TestRepository : IWalletRepository
     public int Saves { get; private set; }
 
     /// <summary>Creates the isolated test wallet snapshot.</summary>
-    public Task<bool> CreateAsync(Wallet wallet, CancellationToken cancellationToken = default)
+    public Task<bool> CreateAsync(Wallet wallet)
     {
         _id = wallet.Id;
         _balance = wallet.Balance;
@@ -27,11 +27,11 @@ internal sealed class TestRepository : IWalletRepository
     }
 
     /// <summary>Loads a fresh wallet instance from the test snapshot.</summary>
-    public Task<Wallet?> GetAsync(Guid id, CancellationToken cancellationToken = default) =>
-        Task.FromResult<Wallet?>(id == this._id ? new Wallet(id, _balance, _version) : null);
+    public Task<Wallet?> GetAsync(Guid id) =>
+        Task.FromResult<Wallet?>(id == _id ? new Wallet(id, _balance, _version) : null);
 
     /// <summary>Simulates a conditional save or configured failure.</summary>
-    public Task<bool> SaveAsync(Wallet wallet, CancellationToken cancellationToken = default)
+    public Task<bool> SaveAsync(Wallet wallet)
     {
         Saves++;
         if (Fail)

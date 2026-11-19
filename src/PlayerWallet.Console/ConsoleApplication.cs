@@ -7,17 +7,17 @@ namespace PlayerWallet.Console;
 /// <summary>Runs a single wallet session over injectable text streams.</summary>
 public sealed class ConsoleApplication(WalletService service, TextReader input, TextWriter output)
 {
-    /// <summary>Runs commands until exit, end-of-input, cancellation, or an unexpected failure.</summary>
-    public async Task<int> RunAsync(CancellationToken cancellationToken = default)
+    /// <summary>Runs commands until exit, end-of-input, or an unexpected failure.</summary>
+    public async Task<int> RunAsync()
     {
         try
         {
-            Guid id = await service.CreateWalletAsync(cancellationToken);
+            Guid id = await service.CreateWalletAsync();
 
-            while (!cancellationToken.IsCancellationRequested)
+            while (true)
             {
-                await output.WriteLineAsync(ConsoleMessages.Prompt.AsMemory(), cancellationToken);
-                string? line = await input.ReadLineAsync(cancellationToken);
+                await output.WriteLineAsync(ConsoleMessages.Prompt);
+                string? line = await input.ReadLineAsync();
                 if (line is null)
                 {
                     break;
@@ -25,8 +25,8 @@ public sealed class ConsoleApplication(WalletService service, TextReader input, 
 
                 if (!CommandParser.TryParse(line, out CommandKind command, out decimal amount))
                 {
-                    Money balance = await service.GetBalanceAsync(id, cancellationToken);
-                    await WriteFailureAsync(ConsoleMessages.InvalidCommand, balance, cancellationToken);
+                    Money balance = await service.GetBalanceAsync(id);
+                    await WriteFailureAsync(ConsoleMessages.InvalidCommand, balance);
                     continue;
                 }
 
@@ -37,28 +37,23 @@ public sealed class ConsoleApplication(WalletService service, TextReader input, 
 
                 OperationResult result = command switch
                 {
-                    CommandKind.Deposit => await service.DepositAsync(id, amount, cancellationToken),
-                    CommandKind.Withdraw => await service.WithdrawAsync(id, amount, cancellationToken),
-                    CommandKind.Bet => await service.PlaceBetAsync(id, amount, cancellationToken),
+                    CommandKind.Deposit => await service.DepositAsync(id, amount),
+                    CommandKind.Withdraw => await service.WithdrawAsync(id, amount),
+                    CommandKind.Bet => await service.PlaceBetAsync(id, amount),
                     _ => throw new InvalidOperationException(ConsoleMessages.InvalidCommand),
                 };
 
-                await WriteResultAsync(command, amount, result, cancellationToken);
+                await WriteResultAsync(command, amount, result);
             }
 
-            await output.WriteLineAsync(ConsoleMessages.Goodbye.AsMemory(), cancellationToken);
-            await output.WriteLineAsync(ReadOnlyMemory<char>.Empty, cancellationToken);
-            await output.WriteLineAsync(ConsoleMessages.ExitPrompt.AsMemory(), cancellationToken);
-            return 0;
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            await output.WriteLineAsync(ConsoleMessages.Cancelled.AsMemory(), CancellationToken.None);
+            await output.WriteLineAsync(ConsoleMessages.Goodbye);
+            await output.WriteLineAsync();
+            await output.WriteLineAsync(ConsoleMessages.ExitPrompt);
             return 0;
         }
         catch (Exception)
         {
-            await output.WriteLineAsync(ConsoleMessages.UnexpectedError.AsMemory(), CancellationToken.None);
+            await output.WriteLineAsync(ConsoleMessages.UnexpectedError);
             return 1;
         }
     }
@@ -76,12 +71,12 @@ public sealed class ConsoleApplication(WalletService service, TextReader input, 
             CommandKind.Deposit => string.Format(
                 CultureInfo.InvariantCulture,
                 ConsoleMessages.DepositFormat,
-                FormatAmount(amount),
+                FormatSubmittedAmount(amount),
                 balance),
             CommandKind.Withdraw => string.Format(
                 CultureInfo.InvariantCulture,
                 ConsoleMessages.WithdrawalFormat,
-                FormatAmount(amount),
+                FormatSubmittedAmount(amount),
                 balance),
             CommandKind.Bet when result.Payout.Amount > 0 => string.Format(
                 CultureInfo.InvariantCulture,
@@ -96,31 +91,30 @@ public sealed class ConsoleApplication(WalletService service, TextReader input, 
         };
     }
 
-    private async Task WriteResultAsync(
-        CommandKind command,
-        decimal amount,
-        OperationResult result,
-        CancellationToken cancellationToken)
+    private async Task WriteResultAsync(CommandKind command, decimal amount, OperationResult result)
     {
         if (result.Error is { } error)
         {
-            await WriteFailureAsync(ConsoleMessages.For(error), result.Balance, cancellationToken);
+            await WriteFailureAsync(ConsoleMessages.For(error), result.Balance);
             return;
         }
 
-        await output.WriteLineAsync(FormatSuccess(command, amount, result).AsMemory(), cancellationToken);
+        await output.WriteLineAsync(FormatSuccess(command, amount, result));
     }
 
-    private Task WriteFailureAsync(string message, Money balance, CancellationToken cancellationToken) =>
+    private Task WriteFailureAsync(string message, Money balance) =>
         output.WriteLineAsync(
             string.Format(
                 CultureInfo.InvariantCulture,
                 ConsoleMessages.FailureFormat,
                 message,
-                FormatAmount(balance.Amount)).AsMemory(),
-            cancellationToken);
+                FormatAmount(balance.Amount)));
 
     private static string FormatAmount(decimal amount) => amount == decimal.Truncate(amount)
         ? amount.ToString(ConsoleMessages.WholeMoneyFormat, CultureInfo.InvariantCulture)
         : amount.ToString(ConsoleMessages.MoneyFormat, CultureInfo.InvariantCulture);
+
+    private static string FormatSubmittedAmount(decimal amount) => amount.ToString(
+        amount.Scale == 0 ? ConsoleMessages.WholeMoneyFormat : ConsoleMessages.MoneyFormat,
+        CultureInfo.InvariantCulture);
 }

@@ -54,7 +54,7 @@ public sealed class Wallet
         return null;
     }
 
-    /// <summary>Applies a stake and gross payout as one balance change.</summary>
+    /// <summary>Applies a positive stake and gross payout as one balance change.</summary>
     /// <param name="stake">The stake to deduct.</param>
     /// <param name="payout">The gross payout to credit.</param>
     /// <returns>The violated rule, or null when the settlement succeeded.</returns>
@@ -64,6 +64,11 @@ public sealed class Wallet
     /// </remarks>
     public WalletError? SettleBet(Money stake, Money payout)
     {
+        if (stake.Amount is 0)
+        {
+            return WalletError.InvalidAmount;
+        }
+
         if (stake.Amount > Balance.Amount)
         {
             return WalletError.InsufficientFunds;

@@ -83,6 +83,12 @@ public sealed class ConsoleApplicationTests
                 40.35m,
                 OperationResult.Success(new Money(0m))));
         Assert.Equal(
+            "Your withdrawal of $44.00 was successful. Your current balance is: $6",
+            ConsoleApplication.FormatSuccess(
+                CommandKind.Withdraw,
+                44.00m,
+                OperationResult.Success(new Money(6m))));
+        Assert.Equal(
             "Congrats - you won $35.35! Your current balance is: $40.35",
             ConsoleApplication.FormatSuccess(
                 CommandKind.Bet,
@@ -155,25 +161,18 @@ public sealed class ConsoleApplicationTests
             StringComparison.Ordinal);
     }
 
-    /// <summary>Exits cleanly when cancelled while waiting for a command.</summary>
+    /// <summary>Echoes a submitted amount with the precision the player typed.</summary>
     [Fact]
-    public async Task CancellationInterruptsPendingRead()
+    public async Task SubmittedAmountsKeepTheirScale()
     {
-        using var cancellation = new CancellationTokenSource();
-        using var input = new BlockingCommandReader();
+        using var input = new StringReader("deposit 50\nwithdraw 44.00\nexit\n");
         using var output = new StringWriter(CultureInfo.InvariantCulture);
         var service = new WalletService(new InMemoryWalletRepository());
-        var app = new ConsoleApplication(service, input, output);
-        var timeout = TimeSpan.FromSeconds(5);
-
-        Task<int> session = app.RunAsync(cancellation.Token);
-        await input.ReadStarted.WaitAsync(timeout);
-        await cancellation.CancelAsync();
-
-        Assert.Equal(0, await session.WaitAsync(timeout));
-        string transcript = output.ToString();
-        Assert.EndsWith("Session cancelled." + Environment.NewLine, transcript, StringComparison.Ordinal);
-        Assert.DoesNotContain("Operation successful.", transcript, StringComparison.Ordinal);
+        Assert.Equal(0, await new ConsoleApplication(service, input, output).RunAsync());
+        Assert.Contains(
+            "Your withdrawal of $44.00 was successful. Your current balance is: $6",
+            output.ToString(),
+            StringComparison.Ordinal);
     }
 
     /// <summary>Ends gracefully on EOF, including after rejected amounts.</summary>
