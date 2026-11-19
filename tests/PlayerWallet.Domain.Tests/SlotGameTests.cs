@@ -139,6 +139,29 @@ public sealed class SlotGameTests
             range => Assert.Equal((1, 1001), range));
     }
 
+    /// <summary>Spreads small wins across the whole band instead of always paying twice the stake.</summary>
+    [Fact]
+    public void SmallWinsCoverTheWholeBand()
+    {
+        const int Rounds = 10_000;
+        var random = new Random(20260101);
+        decimal total = 0m;
+        decimal minimum = decimal.MaxValue;
+        decimal maximum = 0m;
+        for (int round = 0; round < Rounds; round++)
+        {
+            decimal payout = SlotGame.PayoutFor(PayoutBand.SmallWin, Stake, random).Amount;
+            total += payout;
+            minimum = Math.Min(minimum, payout);
+            maximum = Math.Max(maximum, payout);
+        }
+
+        decimal mean = total / Rounds;
+        Assert.InRange(mean, 0.9m * Stake.Amount, 1.1m * Stake.Amount);
+        Assert.True(minimum < 0.1m * Stake.Amount, $"The smallest small win was {minimum}.");
+        Assert.True(maximum > 1.9m * Stake.Amount, $"The largest small win was {maximum}.");
+    }
+
     /// <summary>Prices a large win above twice the stake through ten times the stake.</summary>
     [Fact]
     public void ScriptedLargeWinDrawsAboveTwiceTheStake()

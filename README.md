@@ -33,12 +33,15 @@ end-of-input end the session.
 - Bets are accepted from $1.00 through $10.00 inclusive.
 - Each round draws one category: 50% loss, 40% small win, 10% large win.
 - A loss pays $0. A small win pays uniformly in whole cents from $0.01 through
-  twice the stake. A large win pays uniformly in whole cents above twice the
-  stake through ten times the stake.
+  twice the stake, so the drawn win is anything from near zero to 2x the stake,
+  not always 2x. A large win pays uniformly in whole cents above twice the stake
+  through ten times the stake.
 - The payout is gross winnings: `new balance = old balance - bet + payout`.
 - The brief does not specify the distribution inside a band, so uniform sampling
-  is used. With these bands the expected return is about 100% of the stake, and
-  a small win can be less than the stake.
+  is used. Small wins then average 1x the stake and large wins average 6x, so
+  the expected return is `0.4 * 1x + 0.1 * 6x = 1x`. Paying 2x on every small
+  win would return 1.4x instead. A small win can therefore be less than the
+  stake.
 
 ## Design decisions
 
