@@ -40,6 +40,22 @@ end-of-input end the session.
   is used. With these bands the expected return is about 100% of the stake, and
   a small win can be less than the stake.
 
+## Design decisions
+
+| Decision | Why |
+| --- | --- |
+| One console project, split by folder | There is one executable and one implementation of each contract. Extra projects would add references and build steps without separating anything that changes independently. |
+| `Wallet` owns money invariants; `SlotGame` owns the game rules | The wallet can settle any stake its balance covers, so another game can reuse it. The $1–$10 limit and the payout bands have exactly one home. |
+| Optimistic concurrency (`Version` plus a conditional save) | The store decides how a stale write is detected; the in-memory dictionary and a future database implement the same contract. A conflict fails the operation instead of retrying, because a retry would reroll the round. |
+| Rounds accept an optional `Random` | Production passes `Random.Shared`; tests pass a seeded or scripted source, so a whole round is reproducible and the expected return can be asserted. |
+| `decimal` dollars with a cent-precision invariant | Exact at these ranges and readable at the call site. A production ledger would store integer minor units, and only `Money` would change. |
+| Rules as constants, not configuration | One regulated game. A per-jurisdiction return is a compliance decision, not a toggle; every constant lives in `SlotGame`. |
+| No ledger, database, or DI container | Nothing in the console can observe a history, and no interface has a second implementation yet. |
+
+If this grew into a platform, the first additions would be an append-only ledger
+keyed by wallet ID and version, a repository backed by a database transaction,
+and idempotency keys on deposits once a payment provider is involved.
+
 ## Example
 
 ```text
@@ -84,5 +100,6 @@ The wallet lives in memory and is lost when the process exits.
 
 ## Quality
 
-Warnings are errors, analyzers run at the .NET 11 recommended level, and CI
-restores locked dependencies, verifies formatting, builds, and runs the tests.
+Warnings are errors, analyzers run at the .NET 11 recommended level, and NuGet
+audit fails a restore that pulls a known vulnerability. CI verifies formatting,
+builds, and runs the tests with coverage.
