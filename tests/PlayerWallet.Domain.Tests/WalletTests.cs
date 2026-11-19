@@ -73,13 +73,14 @@ public sealed class WalletTests
         Assert.Equal(0m, wallet.Balance.Amount);
     }
 
-    /// <summary>Rejects zero deposit and withdrawal amounts.</summary>
+    /// <summary>Rejects zero deposit, withdrawal, and stake amounts.</summary>
     [Fact]
     public void ZeroOperationsLeaveBalanceUnchanged()
     {
         var wallet = new Wallet(Guid.NewGuid(), new Money(10));
         Assert.Equal(WalletError.InvalidAmount, wallet.Deposit(default));
         Assert.Equal(WalletError.InvalidAmount, wallet.Withdraw(default));
+        Assert.Equal(WalletError.InvalidAmount, wallet.SettleBet(default, new Money(1)));
         Assert.Equal(10m, wallet.Balance.Amount);
     }
 

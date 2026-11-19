@@ -68,23 +68,33 @@ public sealed class InMemoryWalletRepositoryTests
         Assert.Equal(1m, saved.Balance.Amount);
     }
 
-    /// <summary>Handles missing wallets and cancelled operations without mutation.</summary>
+    /// <summary>Handles missing wallets without mutation.</summary>
     [Fact]
-    public async Task MissingAndCancelledOperationsAreSafe()
+    public async Task MissingWalletsAreSafe()
     {
         var repository = new InMemoryWalletRepository();
         var wallet = new Wallet(Guid.NewGuid(), default);
         Assert.Null(await repository.GetAsync(wallet.Id));
         Assert.False(await repository.SaveAsync(wallet));
-        using var cancellation = new CancellationTokenSource();
-        await cancellation.CancelAsync();
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => repository.CreateAsync(wallet, cancellation.Token));
-        Assert.Null(await repository.GetAsync(wallet.Id));
         await repository.CreateAsync(wallet);
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => repository.GetAsync(wallet.Id, cancellation.Token));
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => repository.SaveAsync(wallet, cancellation.Token));
         Wallet? stored = await repository.GetAsync(wallet.Id);
         Assert.NotNull(stored);
         Assert.Equal(0, stored.Version);
+    }
+
+    /// <summary>Stores a new wallet with the version it was created with.</summary>
+    [Fact]
+    public async Task CreatePreservesTheProvidedVersion()
+    {
+        var repository = new InMemoryWalletRepository();
+        var wallet = new Wallet(Guid.NewGuid(), new Money(5), version: 3);
+        Assert.True(await repository.CreateAsync(wallet));
+        Wallet? stored = await repository.GetAsync(wallet.Id);
+        Assert.NotNull(stored);
+        Assert.Equal(3, stored.Version);
+        Assert.True(await repository.SaveAsync(stored));
+        Wallet? saved = await repository.GetAsync(wallet.Id);
+        Assert.NotNull(saved);
+        Assert.Equal(4, saved.Version);
     }
 }

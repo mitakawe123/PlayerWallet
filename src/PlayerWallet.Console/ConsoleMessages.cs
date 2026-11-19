@@ -20,8 +20,6 @@ internal static class ConsoleMessages
 
     internal const string ExitPrompt = "Press any key to exit.";
 
-    internal const string Cancelled = "Session cancelled.";
-
     internal const string UnexpectedError = "An unexpected error ended the session. The operation outcome could not be confirmed.";
 
     internal const string WholeMoneyFormat = "$0";

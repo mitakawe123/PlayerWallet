@@ -12,10 +12,10 @@ public sealed class WalletService(IWalletRepository repository)
     private readonly IWalletRepository _repository = repository ?? throw new ArgumentNullException(nameof(repository));
 
     /// <summary>Creates a new empty wallet for a session.</summary>
-    public async Task<Guid> CreateWalletAsync(CancellationToken cancellationToken = default)
+    public async Task<Guid> CreateWalletAsync()
     {
         var wallet = new Wallet(Guid.CreateVersion7(), default);
-        if (!await _repository.CreateAsync(wallet, cancellationToken))
+        if (!await _repository.CreateAsync(wallet))
         {
             throw new InvalidOperationException(DuplicateWalletMessage);
         }
@@ -24,13 +24,12 @@ public sealed class WalletService(IWalletRepository repository)
     }
 
     /// <summary>Returns the current wallet balance.</summary>
-    public async Task<Money> GetBalanceAsync(Guid id, CancellationToken cancellationToken = default) =>
-        (await LoadAsync(id, cancellationToken)).Balance;
+    public async Task<Money> GetBalanceAsync(Guid id) => (await LoadAsync(id)).Balance;
 
     /// <summary>Deposits a positive cent-precision amount.</summary>
-    public async Task<OperationResult> DepositAsync(Guid id, decimal amount, CancellationToken cancellationToken = default)
+    public async Task<OperationResult> DepositAsync(Guid id, decimal amount)
     {
-        Wallet wallet = await LoadAsync(id, cancellationToken);
+        Wallet wallet = await LoadAsync(id);
         if (!Money.IsValid(amount) || amount is 0)
         {
             return OperationResult.Rejected(WalletError.InvalidAmount, wallet.Balance);
@@ -41,14 +40,14 @@ public sealed class WalletService(IWalletRepository repository)
             return OperationResult.Rejected(error, wallet.Balance);
         }
 
-        await SaveAsync(wallet, cancellationToken);
+        await SaveAsync(wallet);
         return OperationResult.Success(wallet.Balance);
     }
 
     /// <summary>Withdraws a positive amount without overdrawing the wallet.</summary>
-    public async Task<OperationResult> WithdrawAsync(Guid id, decimal amount, CancellationToken cancellationToken = default)
+    public async Task<OperationResult> WithdrawAsync(Guid id, decimal amount)
     {
-        Wallet wallet = await LoadAsync(id, cancellationToken);
+        Wallet wallet = await LoadAsync(id);
         if (!Money.IsValid(amount) || amount is 0)
         {
             return OperationResult.Rejected(WalletError.InvalidAmount, wallet.Balance);
@@ -59,14 +58,14 @@ public sealed class WalletService(IWalletRepository repository)
             return OperationResult.Rejected(error, wallet.Balance);
         }
 
-        await SaveAsync(wallet, cancellationToken);
+        await SaveAsync(wallet);
         return OperationResult.Success(wallet.Balance);
     }
 
     /// <summary>Generates and commits one round, without retrying or rerolling on conflicts.</summary>
-    public async Task<OperationResult> PlaceBetAsync(Guid id, decimal amount, CancellationToken cancellationToken = default)
+    public async Task<OperationResult> PlaceBetAsync(Guid id, decimal amount)
     {
-        Wallet wallet = await LoadAsync(id, cancellationToken);
+        Wallet wallet = await LoadAsync(id);
         if (!Money.IsValid(amount) || amount is 0)
         {
             return OperationResult.Rejected(WalletError.InvalidAmount, wallet.Balance);
@@ -84,16 +83,16 @@ public sealed class WalletService(IWalletRepository repository)
             return OperationResult.Rejected(settlementError, wallet.Balance);
         }
 
-        await SaveAsync(wallet, cancellationToken);
+        await SaveAsync(wallet);
         return OperationResult.Success(wallet.Balance, payout);
     }
 
-    private async Task<Wallet> LoadAsync(Guid id, CancellationToken cancellationToken) =>
-        await _repository.GetAsync(id, cancellationToken) ?? throw new InvalidOperationException(MissingWalletMessage);
+    private async Task<Wallet> LoadAsync(Guid id) =>
+        await _repository.GetAsync(id) ?? throw new InvalidOperationException(MissingWalletMessage);
 
-    private async Task SaveAsync(Wallet wallet, CancellationToken cancellationToken)
+    private async Task SaveAsync(Wallet wallet)
     {
-        if (!await _repository.SaveAsync(wallet, cancellationToken))
+        if (!await _repository.SaveAsync(wallet))
         {
             throw new InvalidOperationException(ConflictMessage);
         }
