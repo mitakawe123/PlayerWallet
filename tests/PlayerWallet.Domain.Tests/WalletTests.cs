@@ -21,18 +21,6 @@ public sealed class WalletTests
         { -0.01m, false },
     };
 
-    /// <summary>Provides stakes outside the inclusive game limits.</summary>
-    public static TheoryData<decimal> InvalidStakes => new() { 0.99m, 10.01m };
-
-    /// <summary>Provides stake limits and their expected validation results.</summary>
-    public static TheoryData<decimal, WalletError?> BetLimits => new()
-    {
-        { 0.99m, WalletError.InvalidBet },
-        { 1m, null },
-        { 10m, null },
-        { 10.01m, WalletError.InvalidBet },
-    };
-
     /// <summary>Provides payouts and the expected gross-settlement balances.</summary>
     public static TheoryData<decimal, decimal> Settlements => new()
     {
@@ -104,23 +92,22 @@ public sealed class WalletTests
         Assert.Equal(Money.MaximumAmount, wallet.Balance.Amount);
     }
 
-    /// <summary>Checks inclusive bet limits before settlement.</summary>
-    [Theory]
-    [MemberData(nameof(BetLimits))]
-    public void BetLimitsAreInclusive(decimal stake, WalletError? expected)
-    {
-        var wallet = new Wallet(Guid.NewGuid(), new Money(20));
-        Assert.Equal(expected, wallet.ValidateBet(new Money(stake)));
-        Assert.Equal(20m, wallet.Balance.Amount);
-    }
-
-    /// <summary>Rejects a bet the balance cannot cover.</summary>
+    /// <summary>Rejects a settlement the balance cannot cover.</summary>
     [Fact]
-    public void BetCannotExceedTheBalance()
+    public void SettlementCannotExceedTheBalance()
     {
         var wallet = new Wallet(Guid.NewGuid(), new Money(5));
-        Assert.Equal(WalletError.InsufficientFunds, wallet.ValidateBet(new Money(10)));
+        Assert.Equal(WalletError.InsufficientFunds, wallet.SettleBet(new Money(10), new Money(1)));
         Assert.Equal(5m, wallet.Balance.Amount);
+    }
+
+    /// <summary>Leaves stake limits to the game rules, so any covered stake settles.</summary>
+    [Fact]
+    public void SettlementDoesNotApplyGameLimits()
+    {
+        var wallet = new Wallet(Guid.NewGuid(), new Money(10));
+        Assert.Null(wallet.SettleBet(new Money(0.5m), new Money(0.5m)));
+        Assert.Equal(10m, wallet.Balance.Amount);
     }
 
     /// <summary>Uses gross payouts, including loss and payouts smaller than the stake.</summary>
@@ -131,16 +118,6 @@ public sealed class WalletTests
         var wallet = new Wallet(Guid.NewGuid(), new Money(10));
         Assert.Null(wallet.SettleBet(new Money(5), new Money(payout)));
         Assert.Equal(expected, wallet.Balance.Amount);
-    }
-
-    /// <summary>Rejects settlement when the stake is outside the game limits.</summary>
-    [Theory]
-    [MemberData(nameof(InvalidStakes))]
-    public void SettlementRejectsStakesOutsideTheLimits(decimal stake)
-    {
-        var wallet = new Wallet(Guid.NewGuid(), new Money(100));
-        Assert.Equal(WalletError.InvalidBet, wallet.SettleBet(new Money(stake), new Money(1)));
-        Assert.Equal(100m, wallet.Balance.Amount);
     }
 
     /// <summary>Does not deduct the stake when the final balance exceeds the supported range.</summary>

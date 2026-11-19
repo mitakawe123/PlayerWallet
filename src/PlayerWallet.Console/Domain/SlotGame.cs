@@ -15,10 +15,28 @@ public static class SlotGame
     /// <summary>The percentage of draws that win up to twice the stake.</summary>
     public const int SmallWinPercent = 40;
 
+    private const int SmallWinMultiplier = 2;
+    private const int LargeWinMultiplier = 10;
+
+    /// <summary>Checks whether a stake is inside the inclusive game limits.</summary>
+    /// <param name="stake">The stake to check.</param>
+    /// <returns>True when the stake can be played.</returns>
+    public static bool IsStakeWithinLimits(decimal stake) => stake is >= MinimumBet and <= MaximumBet;
+
     /// <summary>Plays one round and returns its gross payout.</summary>
     /// <param name="stake">The stake, within the game limits.</param>
     /// <returns>The gross payout, or zero for a loss.</returns>
-    public static Money Play(Money stake) => PayoutFor(Classify(Random.Shared.Next(0, 100)), stake);
+    public static Money Play(Money stake) => Play(stake, Random.Shared);
+
+    /// <summary>Plays one round using a caller-supplied random source.</summary>
+    /// <param name="stake">The stake, within the game limits.</param>
+    /// <param name="random">The source of the band draw and of the payout draw.</param>
+    /// <returns>The gross payout, or zero for a loss.</returns>
+    public static Money Play(Money stake, Random random)
+    {
+        ArgumentNullException.ThrowIfNull(random);
+        return PayoutFor(Classify(random.Next(0, 100)), stake, random);
+    }
 
     /// <summary>Selects the payout band for a draw from 0 through 99.</summary>
     /// <param name="draw">A draw from 0 through 99.</param>
@@ -40,9 +58,17 @@ public static class SlotGame
     /// <param name="band">The payout band for the round.</param>
     /// <param name="stake">The stake, within the game limits.</param>
     /// <returns>The gross payout, or zero for a loss.</returns>
-    public static Money PayoutFor(PayoutBand band, Money stake)
+    public static Money PayoutFor(PayoutBand band, Money stake) => PayoutFor(band, stake, Random.Shared);
+
+    /// <summary>Returns a gross payout drawn from a caller-supplied random source.</summary>
+    /// <param name="band">The payout band for the round.</param>
+    /// <param name="stake">The stake, within the game limits.</param>
+    /// <param name="random">The source of the payout draw.</param>
+    /// <returns>The gross payout, or zero for a loss.</returns>
+    public static Money PayoutFor(PayoutBand band, Money stake, Random random)
     {
-        if (stake.Amount < MinimumBet || stake.Amount > MaximumBet)
+        ArgumentNullException.ThrowIfNull(random);
+        if (!IsStakeWithinLimits(stake.Amount))
         {
             throw new ArgumentOutOfRangeException(nameof(stake));
         }
@@ -51,8 +77,10 @@ public static class SlotGame
         return band switch
         {
             PayoutBand.Loss => default,
-            PayoutBand.SmallWin => new Money(Random.Shared.Next(1, (2 * cents) + 1) / 100m),
-            PayoutBand.LargeWin => new Money(Random.Shared.Next((2 * cents) + 1, (10 * cents) + 1) / 100m),
+            PayoutBand.SmallWin => new Money(random.Next(1, (SmallWinMultiplier * cents) + 1) / 100m),
+            PayoutBand.LargeWin => new Money(random.Next(
+                (SmallWinMultiplier * cents) + 1,
+                (LargeWinMultiplier * cents) + 1) / 100m),
             _ => throw new ArgumentOutOfRangeException(nameof(band)),
         };
     }

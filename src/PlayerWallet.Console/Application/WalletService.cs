@@ -73,9 +73,9 @@ public sealed class WalletService(IWalletRepository repository)
         }
 
         var stake = new Money(amount);
-        if (wallet.ValidateBet(stake) is { } error)
+        if (!SlotGame.IsStakeWithinLimits(stake.Amount))
         {
-            return OperationResult.Rejected(error, wallet.Balance);
+            return OperationResult.Rejected(WalletError.InvalidBet, wallet.Balance);
         }
 
         Money payout = SlotGame.Play(stake);

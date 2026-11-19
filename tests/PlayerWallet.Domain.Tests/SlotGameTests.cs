@@ -10,6 +10,22 @@ public sealed class SlotGameTests
     /// <summary>Provides stakes outside the inclusive game limits.</summary>
     public static TheoryData<decimal> InvalidStakes => new() { 0.99m, 10.01m };
 
+    /// <summary>Provides stakes and whether they are inside the inclusive game limits.</summary>
+    public static TheoryData<decimal, bool> StakeLimits => new()
+    {
+        { 0m, false },
+        { 0.99m, false },
+        { 1m, true },
+        { 10m, true },
+        { 10.01m, false },
+    };
+
+    /// <summary>Accepts exactly the inclusive game limits.</summary>
+    [Theory]
+    [MemberData(nameof(StakeLimits))]
+    public void StakeLimitsAreInclusive(decimal stake, bool expected) =>
+        Assert.Equal(expected, SlotGame.IsStakeWithinLimits(stake));
+
     /// <summary>Checks the exact band boundaries.</summary>
     [Theory]
     [InlineData(0, PayoutBand.Loss)]
@@ -101,4 +117,71 @@ public sealed class SlotGameTests
     [MemberData(nameof(InvalidStakes))]
     public void PlayRejectsStakesOutsideTheLimits(decimal stake) =>
         Assert.Throws<ArgumentOutOfRangeException>(() => SlotGame.Play(new Money(stake)));
+
+    /// <summary>Draws the band from 0 through 99 and prices a loss without a second draw.</summary>
+    [Fact]
+    public void ScriptedLossDrawsOnlyTheBand()
+    {
+        var random = new ScriptedRandom(0);
+        Assert.Equal(0m, SlotGame.Play(Stake, random).Amount);
+        Assert.Collection(random.Ranges, range => Assert.Equal((0, 100), range));
+    }
+
+    /// <summary>Prices a small win from one cent through twice the stake.</summary>
+    [Fact]
+    public void ScriptedSmallWinDrawsWithinTwiceTheStake()
+    {
+        var random = new ScriptedRandom(50, 1);
+        Assert.Equal(0.01m, SlotGame.Play(Stake, random).Amount);
+        Assert.Collection(
+            random.Ranges,
+            range => Assert.Equal((0, 100), range),
+            range => Assert.Equal((1, 1001), range));
+    }
+
+    /// <summary>Prices a large win above twice the stake through ten times the stake.</summary>
+    [Fact]
+    public void ScriptedLargeWinDrawsAboveTwiceTheStake()
+    {
+        var random = new ScriptedRandom(90, 1001);
+        Assert.Equal(10.01m, SlotGame.Play(Stake, random).Amount);
+        Assert.Collection(
+            random.Ranges,
+            range => Assert.Equal((0, 100), range),
+            range => Assert.Equal((1001, 5001), range));
+    }
+
+    /// <summary>Returns about the stake over many rounds, as the published bands imply.</summary>
+    [Fact]
+    public void RoundsReturnAboutTheStakeOnAverage()
+    {
+        const int Rounds = 200_000;
+        var random = new Random(20260101);
+        decimal paid = 0m;
+        for (int round = 0; round < Rounds; round++)
+        {
+            paid += SlotGame.Play(Stake, random).Amount;
+        }
+
+        Assert.InRange(paid / (Rounds * Stake.Amount), 0.98m, 1.02m);
+    }
+
+    /// <summary>Returns queued draws and records the inclusive ranges it was asked for.</summary>
+    private sealed class ScriptedRandom : Random
+    {
+        private readonly Queue<int> _values;
+        private readonly List<(int Min, int Max)> _ranges = [];
+
+        public ScriptedRandom(params int[] values) => _values = new(values);
+
+        public IReadOnlyList<(int Min, int Max)> Ranges => _ranges;
+
+        public override int Next(int minValue, int maxValue)
+        {
+            _ranges.Add((minValue, maxValue));
+            int value = _values.Dequeue();
+            Assert.InRange(value, minValue, maxValue - 1);
+            return value;
+        }
+    }
 }
